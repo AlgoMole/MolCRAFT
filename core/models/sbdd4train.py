@@ -243,7 +243,6 @@ class SBDDTrainLoop(pl.LightningModule):
         ) # List[bool]
         molist = []
         for i in range(num_graphs):
-            # TODO: fix seg fault during reconstruction (caused by GetConformer().GetPositions())
             try:
                 mol = reconstruct.reconstruct_from_generated(
                     pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64),
