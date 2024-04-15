@@ -27,13 +27,13 @@ make
 
 -----
 ## Data
-The data used for training / evaluating the model are organized in the [data](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder
+Data used for training / evaluating the model should be put in the `data` folder by default, and accessible in the [data](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder.
 
-To train the model from scratch, download the lmdb file and split file:
+To train the model from scratch, download the lmdb file and split file into data folder:
 * `crossdocked_v1.1_rmsd1.0_pocket10_processed_final.lmdb`
 * `crossdocked_pocket10_pose_split.pt`
 
-To evaluate the model on the test set, download _and_ unzip the `test_set.zip`. It includes the original PDB files that will be used in Vina Docking.
+To evaluate the model on the test set, download _and_ unzip the `test_set.zip` into data folder. It includes the original PDB files that will be used in Vina Docking.
 
 We also provide the script for preprocessing the featurization for the lmdb data in `transform.py`. To enable accelerated training, set the yaml file as follows:
 
@@ -60,6 +60,7 @@ python train_bfn.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
+We provide the pretrained checkpoint as [pretrained.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
 ### Sampling for pockets in the testset
 ```bash
 python train_bfn.py --config_file configs/test.yaml --exp_name {EXP} --revision {REVISION} --test_only --num_samples {NUM_MOLS_PER_POCKET} --sample_steps 100
@@ -72,7 +73,10 @@ python sample_for_pocket.py --config_file configs/test.yaml --protein_path {PDB_
 ```
 
 ## Evaluation
+### Evaluating molecules
 For binding affinity (Vina Score / Min / Dock) and molecular properties (QED, SA), it is calculated upon sampling.
 
 For PoseCheck (strain energy, clashes) and other conformational results (bond length, bond angle, torsion angle, RMSD), please refer to `test` folder.
 
+### Evaluating meta files
+We provide samples for all SBDD baselines in the [sample](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder. 
