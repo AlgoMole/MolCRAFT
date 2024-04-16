@@ -60,9 +60,9 @@ accounting:
 
 
 data:
-  name: pl # pl, pl_tr
-  path: /sharefs/qiukeyue/home/data/crossdocked_v1.1_rmsd1.0_pocket10
-  split:  /sharefs/qiukeyue/home/data/crossdocked_pocket10_pose_split.pt
+  name: pl_tr # pl, pl_tr
+  path: ./data/crossdocked_v1.1_rmsd1.0_pocket10
+  split:  ./data/crossdocked_pocket10_pose_split.pt
   transform:
     ligand_atom_mode: add_aromatic
   with_split: True
@@ -107,13 +107,12 @@ train:
 
 evaluation:
   batch_size: 100
-  last_ckpt: !SUB ${last_ckpt:-null}
   sample_steps: !SUB ${sample_steps}
   num_samples: !SUB ${num_samples}  # x-% test
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']
   docking_config:
     mode: !SUB ${docking_mode} # ['qvina', 'vina_score', 'vina_dock']
-    protein_root: /sharefs/qiukeyue/home/data/test_set
+    protein_root: ./data/test_set
     exhaustiveness: 16
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}

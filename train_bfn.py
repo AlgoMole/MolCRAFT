@@ -196,7 +196,6 @@ if __name__ == "__main__":
     parser.add_argument("--sample_steps", type=int, default=100)
     parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
     parser.add_argument("--visual_chain", action="store_true")
-    parser.add_argument("--last_ckpt", action="store_true")
     parser.add_argument("--docking_mode", type=str, default="vina_score", choices=['vina_score', 'vina_dock'])
 
     _args = parser.parse_args()
@@ -310,12 +309,5 @@ if __name__ == "__main__":
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         trainer.test(model, dataloaders=val_loader, ckpt_path="last")
     else:
-        if cfg.evaluation.last_ckpt:
-            trainer.test(model, dataloaders=test_loader, ckpt_path="last")
-        else:
-            ckpts = glob.glob(os.path.join(cfg.accounting.checkpoint_dir, "*complete*"))
-            best_ckpt = sorted(ckpts, key=lambda x: float(x.split("complete")[-1][:4]))[-1]
-            # best_ckpt = sorted(ckpts, key=lambda x: float(x.split("val_loss")[-1][:4]))[0]
-            print(f"Detected best_ckpt: {best_ckpt}")
-            trainer.test(model, dataloaders=test_loader, ckpt_path=best_ckpt)
+        trainer.test(model, dataloaders=test_loader, ckpt_path="last")
 
