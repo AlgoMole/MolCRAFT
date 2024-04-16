@@ -21,7 +21,8 @@ make
 
 > [!NOTE]
 > - The `make` will automatically build the docker image and run the container, inside which your host home directory will be mounted to `${HOME}/home`. The docker image supports running any command inside a tmux session.
-> - Exiting from container wound't stop the container, nor the tmux sessions running in it. To enter an existing container, simply run `make` again. If you need to stop this container, run `make kill`.
+> - If `make` exits with error messages with pip, try `make` again in case of any network connection timeout. 
+> - Once `make` succeeds, note that exiting from container wound't stop it, nor the tmux sessions running within. To enter an existing container, simply run `make` again. If you need to stop this container, run `make kill`.
 > - For customized environment setup, please refer to files `docker/Dockerfile`, `docker/asset/requirements.txt` and `docker/asset/apt_packages.txt`. 
 
 

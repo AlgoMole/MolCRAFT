@@ -96,9 +96,9 @@ def evaluate_one_file(file, eval_args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', type=eval, default=False)
-    parser.add_argument('--model_path', type=str, default='./data')
+    parser.add_argument('--mol_dir', type=str, default='./data')
     parser.add_argument('--outdir', type=str, default='outputs')
-    parser.add_argument('--protein_root', type=str, default='/sharefs/share/sbdd_data/test_set')
+    parser.add_argument('--protein_root', type=str, default='./data/test_set')
     parser.add_argument('--docking_mode', type=str, default='vina_dock', choices=['qvina', 'vina_score', 'vina_dock', 'none'])
     parser.add_argument('--exhaustiveness', type=int, default=16)
     parser.add_argument('--sequential', default=False, action='store_true')
@@ -108,10 +108,10 @@ def main():
     Path(eval_args.outdir).mkdir(parents=True, exist_ok=True)
     logger = misc.get_logger('evaluate', log_dir=eval_args.outdir)
 
-    if 'FLAG' in eval_args.model_path:
-        files = glob.glob(join(eval_args.model_path, '*/*.sdf'))
+    if 'FLAG' in eval_args.mol_dir:
+        files = glob.glob(join(eval_args.mol_dir, '*/*.sdf'))
     else:
-        files = glob.glob(join(eval_args.model_path, '*.sdf'))
+        files = glob.glob(join(eval_args.mol_dir, '*.sdf'))
 
     print(len(files), files[0])
     results = []
@@ -139,7 +139,7 @@ def main():
                     basepath = Path(file).stem
                     mol.SetProp('ligand_filename', basepath)
                 mol.SetProp('original_path', file)
-            if 'FLAG' in eval_args.model_path:
+            if 'FLAG' in eval_args.mol_dir:
                 try:
                     AllChem.UFFOptimizeMolecule(mol)
                 except:

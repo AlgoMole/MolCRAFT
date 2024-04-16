@@ -3,3 +3,4 @@ autoconf
 less 
 tmux
 libxrender1
+ssh

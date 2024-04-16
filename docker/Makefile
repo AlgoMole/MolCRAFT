@@ -37,8 +37,8 @@ kill:
 		echo "container ${CONTRAINER_NAME} exists, killing it first"; \
 		docker container kill  ${CONTRAINER_NAME}; fi
 
-build_private: _setup_sshkey _setup_gitconfig
-	DOCKER_BUILDKIT=1 docker build --no-cache --pull --target private \
+build_private: build_public _setup_sshkey _setup_gitconfig
+	DOCKER_BUILDKIT=1 docker build --no-cache --target private \
 		--build-arg PUBLIC_IMAGE=${PUBLIC_IMAGE} \
 		--build-arg TORCH_HOME=${TO_TORCH_HOME} \
 		--build-arg https_proxy=${HTTPS_PROXY} \
@@ -48,15 +48,13 @@ build_private: _setup_sshkey _setup_gitconfig
 		--build-arg _UID=${_UID} \
 		--build-arg _GID=${_GID} \
 		--build-arg PW=${PW} \
-		-t ${PRIVATE_IMAGE} .; \
-	docker push ${PRIVATE_IMAGE}
+		-t ${PRIVATE_IMAGE} .
 
 build_public:
 	DOCKER_BUILDKIT=1 docker build --pull --target public --build-arg BASE_IMAGE=${BASE_IMAGE} \
 	--build-arg https_proxy=${HTTPS_PROXY} \
 	--build-arg http_proxy=${HTTP_PROXY} \
 	-t ${PUBLIC_IMAGE} .
-	docker push ${PUBLIC_IMAGE}
 
 _exec:
 	docker exec -it ${CONTRAINER_NAME} zsh

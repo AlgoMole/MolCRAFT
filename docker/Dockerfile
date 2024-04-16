@@ -5,8 +5,7 @@ FROM ${BASE_IMAGE} as public
 COPY ./asset /tmp/build
 
 RUN apt update && \
-    xargs apt install -y < /tmp/build/apt_packages.txt && \
-    pip install gpustat
+    xargs apt install -y < /tmp/build/apt_packages.txt
 
 RUN pip install -r /tmp/build/requirements.txt \
     && rm -rf /tmp/build
@@ -21,13 +20,12 @@ ARG PW
 ARG _HOME=/sharefs/${_USER}
 
 COPY ./asset /tmp/build
-RUN xargs apt install -y < /tmp/build/apt_packages.txt && \
-    pip install gpustat
-
+RUN xargs apt install -y < /tmp/build/apt_packages.txt
 RUN pip install -r /tmp/build/requirements.txt
 
 # Option1: Using unencrypted password/ specifying password
 RUN usermod --password $(echo ${PW} | openssl passwd -1 -stdin) root
+RUN mkdir -p ${_HOME}
 RUN useradd -m ${_USER} -d ${_HOME} --uid=${_UID} -s /usr/bin/zsh && echo "${_USER}:${PW}" | chpasswd
 
 # make the color of zsh-autosuggestions right
@@ -38,8 +36,8 @@ RUN cp -r /root/.oh-my-zsh ${_HOME} && chown ${_USER}:${_USER} -R ${_HOME}/.oh-m
     cp /root/.tmux.conf ${_HOME} && chown ${_USER}:${_USER} -R ${_HOME}/.tmux.conf && \
     cp -r /root/.tmux ${_HOME} && chown ${_USER}:${_USER} -R ${_HOME}/.tmux
 
-RUN chown ${_USER}:${_USER} -R /tmp/build
-RUN chown ${_USER}:${_USER} -R ${_HOME}
+RUN chown ${_USER}:${_USER} -R /tmp/build && \
+    chown ${_USER}:${_USER} -R ${_HOME}
 USER ${_UID}:${_GID}
 WORKDIR ${_HOME}
 
