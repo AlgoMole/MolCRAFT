@@ -36,7 +36,7 @@ To train the model from scratch, download the lmdb file and split file into data
 
 To evaluate the model on the test set, download _and_ unzip the `test_set.zip` into data folder. It includes the original PDB files that will be used in Vina Docking.
 
-We also provide the script for preprocessing the featurization for the lmdb data in `transform.py`. To enable accelerated training, set the yaml file as follows:
+By default, We transform the lmdb further into the featurized dataset as `crossdocked_v1.1_rmsd1.0_pocket10_add_aromatic_transformed_simple.pt` as described in `transform.py`, which might take several minutes. To enable accelerated training, the yaml file will be set as follows:
 
 ```yaml
 data:
@@ -45,6 +45,7 @@ data:
 
 ---
 ## Training
+Run `make -f scripts.mk` (without the need for data preparation), or alternatively (with data folder correctly configured),
 ```bash
 python train_bfn.py --exp_name {EXP} --revision {REVISION}
 ```
@@ -55,7 +56,7 @@ python train_bfn.py --sigma1_coord 0.03 --beta1 1.5 --lr 5e-4 --time_emb_dim 1 -
 ```
 
 ### Debugging
-For quick debugging training process:
+For quick debugging training process, run `make debug -f scripts.mk`:
 ```bash
 python train_bfn.py --no_wandb --debug --epochs 1
 ```
@@ -63,12 +64,18 @@ python train_bfn.py --no_wandb --debug --epochs 1
 ## Sampling
 We provide the pretrained checkpoint as [pretrained.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
 ### Sampling for pockets in the testset
+Run `make evaluate -f scripts.mk`, or alternatively,
 ```bash
 python train_bfn.py --config_file configs/test.yaml --exp_name {EXP} --revision {REVISION} --test_only --num_samples {NUM_MOLS_PER_POCKET} --sample_steps 100
 ```
 
+The output molecules will be saved in `${HOME}/home/logs/{exp_name}/{revision}/test
+_outputs/mols`. If the sampling is run multiple times, there will be several `mols-v{version_number}` folders.
+
 ### Sampling from pdb file
-To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand):
+To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
+
+Then, run `make sample -f scripts.mk`, or alternatively,
 ```bash
 python sample_for_pocket.py --config_file configs/test.yaml --protein_path {PDB_ID}_protein.pdb --ligand_path {PDB_ID}_molecule.sdf
 ```

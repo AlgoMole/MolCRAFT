@@ -21,9 +21,6 @@ dynamics:
   discrete_steps: !SUB ${discrete_steps}
   destination_prediction: !SUB ${destination_prediction}
   sampling_strategy: !SUB ${sampling_strategy}
-  
-  # no_diff_coord: !SUB ${no_diff_coord}
-  # charge_discretised_loss: !SUB ${charge_discretised_loss}
   node_indicator: True
   time_emb_dim: !SUB ${time_emb_dim}
   time_emb_mode: !SUB ${time_emb_mode}
@@ -54,13 +51,13 @@ accounting:
   logdir: &_logdir !PATHJOIN [!ENV "${HOME}/home/logs/", *_project_name, !SUB "${exp_name}", *_revision]
   dump_config_path: !PATHJOIN [*_logdir, "config.yaml"]
   wandb_logdir: *_logdir
-  checkpoint_dir: !PATHJOIN [*_logdir, "checkpoints"]
+  checkpoint_dir: ./checkpoints
   generated_mol_dir: !PATHJOIN [*_logdir, "generated_mol"]
   test_outputs_dir: !PATHJOIN [*_logdir, "test_outputs"]
 
 
 data:
-  name: pl_tr # pl, pl_tr
+  name: pl # pl, pl_tr
   path: ./data/crossdocked_v1.1_rmsd1.0_pocket10
   split:  ./data/crossdocked_pocket10_pose_split.pt
   transform:
@@ -111,12 +108,9 @@ evaluation:
   num_samples: !SUB ${num_samples}  # x-% test
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']
   docking_config:
-    mode: !SUB ${docking_mode} # ['qvina', 'vina_score', 'vina_dock']
+    mode: !SUB ${docking_mode}  # ['qvina', 'vina_score', 'vina_dock']
     protein_root: ./data/test_set
     exhaustiveness: 16
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}
-
-
-
 

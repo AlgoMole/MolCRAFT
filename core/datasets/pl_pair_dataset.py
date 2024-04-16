@@ -365,28 +365,8 @@ class PocketLigandPairDatasetFeaturized(Dataset):
 
 if __name__ == '__main__':
     # original dataset
-    # dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10')
-    # print(len(dataset), dataset[0])
-
-    ############################################################
-    # test PocketLigandPairDatasetFromComplex
-    dataset = PocketLigandPairDatasetFromComplex('/sharefs/share/sbdd_data/PDBLigAug')
+    dataset = PocketLigandPairDataset('./data/crossdocked_v1.1_rmsd1.0_pocket10')
     print(len(dataset), dataset[0])
-    allowed_elements = {1, 6, 7, 8, 9, 15, 16, 17, 35}
-    elements = {i: set() for i in range(90)}
-    for i, data in enumerate(tqdm(dataset, desc='Filter')):
-        for e in data.ligand_element:
-            elements[e.item()].add(i)
-
-    all_id = set(range(len(dataset)))
-    blocked_id = set().union(*[
-        elements[i] for i in elements.keys() if i not in allowed_elements
-    ])
-
-    allowed_id = list(all_id - blocked_id)
-    print('Allowed: %d' % len(allowed_id))
-    with open('allowed_id_35.pkl', 'wb') as f:
-        pickle.dump(allowed_id, f)
 
     ############################################################
 
