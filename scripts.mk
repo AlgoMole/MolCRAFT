@@ -15,5 +15,5 @@ debug: data
 	python train_bfn.py --config_file configs/default.yaml --debug --epochs 1 --no_wandb
 
 evaluate: data checkpoint
-	python train_bfn.py --config_file configs/test.yaml --test_only --num_samples 1 --sample_steps 100
+	python train_bfn.py --config_file configs/test.yaml --test_only --num_samples 1 --sample_steps 100 --no_wandb
 

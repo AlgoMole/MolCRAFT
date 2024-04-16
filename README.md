@@ -62,7 +62,7 @@ python train_bfn.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
-We provide the pretrained checkpoint as [pretrained.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
+We provide the pretrained checkpoint as [last.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
 ### Sampling for pockets in the testset
 Run `make evaluate -f scripts.mk`, or alternatively,
 ```bash
