@@ -137,5 +137,7 @@ dmypy.json
 # Customized
 tmp
 data/
+checkpoints/
 ssh/
 gitconfig
+samples/
