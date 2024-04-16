@@ -75,7 +75,6 @@ _outputs/mols`. If the sampling is run multiple times, there will be several `mo
 ### Sampling from pdb file
 To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
 
-Then, run `make sample -f scripts.mk`, or alternatively,
 ```bash
 python sample_for_pocket.py --config_file configs/test.yaml --protein_path {PDB_ID}_protein.pdb --ligand_path {PDB_ID}_molecule.sdf
 ```
@@ -87,4 +86,6 @@ For binding affinity (Vina Score / Min / Dock) and molecular properties (QED, SA
 For PoseCheck (strain energy, clashes) and other conformational results (bond length, bond angle, torsion angle, RMSD), please refer to `test` folder.
 
 ### Evaluating meta files
-We provide samples for all SBDD baselines in the [sample](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder. 
+We provide samples for all SBDD baselines in the [sample](https://drive.google.com/drive/folders/1A3Mthm9ksbfUnMCe5T2noGsiEV1RfChH?usp=sharing) Google Drive folder.
+
+You may download the `all_samples.tar.gz` and then `tar xzvf all_samples.tar.gz`, which extracts all the pt files into `samples` folder for evaluation.
