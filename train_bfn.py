@@ -47,7 +47,7 @@ def get_dataloader(cfg):
         transform_list = [
             protein_featurizer,
             ligand_featurizer, 
-            trans.FeaturizeLigandBond(),
+            # trans.FeaturizeLigandBond(),
         ]
 
         transform = Compose(transform_list)
@@ -55,7 +55,7 @@ def get_dataloader(cfg):
         cfg.dynamics.ligand_atom_feature_dim = ligand_featurizer.feature_dim
         dataset, subsets = get_dataset(config=cfg.data, transform=transform)
         train_set, test_set = subsets['train'], subsets['test']
-    if 'val' in subsets:
+    if 'val' in subsets and len(subsets['val']) > 0:
         val_set = subsets['val']
     else:
         val_set = test_set
@@ -235,7 +235,6 @@ if __name__ == "__main__":
                 tr_cfg.evaluation.batch_size = 4
         tr_cfg.data = cfg.data
         tr_cfg.seed = cfg.seed
-        tr_cfg.data.name = 'pl'
         cfg = tr_cfg
         if not hasattr(cfg.train, 'max_grad_norm'):
             cfg.train.max_grad_norm = 'Q'
