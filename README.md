@@ -6,7 +6,7 @@ Official implementation of ["MolCRAFT: Structure-Based Drug Design in Continuous
 ## Environment
 
 ### Prerequisite
-You will need to have a host machine with gpu, and have a docker with `nvidia-container-runtime` enabled.
+You will need a host machine with gpu, and a docker with `nvidia-container-runtime` enabled.
 
 > [!TIP]
 > - This repo provide an easy-to-use script to install docker and nvidia-container-runtime, in `./docker` run `sudo ./setup_docker_for_host.sh` to setup your host machine.
