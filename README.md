@@ -1,6 +1,6 @@
 # MolCRAFT
 
-Official implementation of "MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space".
+Official implementation of ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
 
 ## Environment
