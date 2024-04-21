@@ -2,10 +2,12 @@ from collections import Counter
 from copy import deepcopy
 
 import numpy as np
+from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, Descriptors, Crippen, Lipinski
 from rdkit.Chem.FilterCatalog import *
 from rdkit.Chem.QED import qed
 
+from tqdm import tqdm
 from core.evaluation.utils.sascorer import compute_sa_score
 
 
@@ -148,3 +150,30 @@ def get_conformer_energies(mol, force_field='mmff'):
         energies.append(energy)
     energies = np.asarray(energies, dtype=float)
     return energies
+
+
+def tanimoto_sim(mol, ref):
+    fp1 = Chem.RDKFingerprint(ref)
+    fp2 = Chem.RDKFingerprint(mol)
+    return DataStructs.TanimotoSimilarity(fp1,fp2)
+
+def tanimoto_dis(mol, ref):
+    return 1 - tanimoto_sim(mol, ref)
+
+def tanimoto_dis_N_to_1(mols, ref):
+    sim = [tanimoto_dis(m, ref) for m in mols]
+    return sim
+
+def compute_diversity(results):
+    diversity = []
+    for res in tqdm(results, desc='pocket'):
+        pocket_results = [r for r in res if r['mol'] is not None]
+
+        mols = [r['mol'] for r in pocket_results]
+        for j in range(len(mols)):
+            tmp = tanimoto_dis_N_to_1(mols, mols[j])
+            tmp.pop(j)
+            diversity += tmp
+    diversity = np.array(diversity)
+    print('[Diversity] Avg: %.4f | Med: %.4f ' % (np.mean(diversity), np.median(diversity)))
+    return diversity
