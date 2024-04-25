@@ -1,5 +1,5 @@
 project_name: &_project_name !ENV "${LOGNAME}_bfn_sbdd"
-exp_name: !SUB ${exp_name}
+exp_name: &_exp_name !SUB ${exp_name}
 revision: &_revision !SUB ${revision}
 debug: !SUB ${debug}
 no_wandb: !SUB ${no_wandb}
@@ -51,11 +51,12 @@ dynamics:
 
 
 accounting:
-  logdir: &_logdir !PATHJOIN [!ENV "${HOME}/home/logs/", *_project_name, !SUB "${exp_name}", *_revision]
+  logdir: &_logdir !PATHJOIN ["./logs/", *_project_name, *_exp_name, *_revision]
   dump_config_path: !PATHJOIN [*_logdir, "config.yaml"]
   wandb_logdir: *_logdir
   checkpoint_dir: !PATHJOIN [*_logdir, "checkpoints"]
   generated_mol_dir: !PATHJOIN [*_logdir, "generated_mol"]
+  val_outputs_dir: !PATHJOIN [*_logdir, "val_outputs"]
   test_outputs_dir: !PATHJOIN [*_logdir, "test_outputs"]
 
 
@@ -84,7 +85,7 @@ train:
   num_workers: 8
   pos_noise_std: !SUB ${pos_noise_std}
   random_rot: !SUB ${random_rot}
-  val_freq: 1000
+  val_freq: 2000
   epochs: !SUB ${epochs}
   resume: !SUB ${resume}
   v_loss_weight: !SUB ${v_loss_weight}
@@ -106,6 +107,7 @@ train:
 
 
 evaluation:
+  ckpt_path: !SUB ${ckpt_path}
   batch_size: 100
   sample_steps: !SUB ${sample_steps}
   num_samples: !SUB ${num_samples}  # x-% test

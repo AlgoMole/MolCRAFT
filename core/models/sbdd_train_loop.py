@@ -154,6 +154,7 @@ class SBDDTrainLoop(pl.LightningModule):
         return self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref')
 
     def test_step(self, batch, batch_idx):
+        # TODO change order, samples of the same pocket should be together, reduce protein loading
         out_data_list = []
         for _ in range(self.cfg.evaluation.num_samples):
             out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms))
@@ -241,23 +242,23 @@ class SBDDTrainLoop(pl.LightningModule):
         pred_aromatic = trans.is_aromatic_from_index(
             pred_v, mode=self.cfg.data.transform.ligand_atom_mode
         ) # List[bool]
-        molist = []
+        
+        results = []
         for i in range(num_graphs):
+            pos = pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64)
+            atom_types = pred_atom_type[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]]
+            is_aromatic = pred_aromatic[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]]
             try:
-                mol = reconstruct.reconstruct_from_generated(
-                    pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64),
-                    pred_atom_type[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
-                    pred_aromatic[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
-                )
+                mol = reconstruct.reconstruct_from_generated(pos, atom_types, is_aromatic)
             except reconstruct.MolReconsError:
                 mol = None
-            molist.append(mol)
+            results.append(mol)
         
         # add necessary dict to new pyg batch
         out_batch.x, out_batch.pos = atom_type, pred_pos
         out_batch.atom_type = torch.tensor(pred_atom_type, dtype=torch.long, device=ligand_pos.device)
         out_batch.is_aromatic = torch.tensor(pred_aromatic, dtype=torch.long, device=ligand_pos.device)
-        out_batch.mol = molist
+        out_batch.mol = results
 
         _slice_dict = {
             "x": ligand_cum_atoms,
