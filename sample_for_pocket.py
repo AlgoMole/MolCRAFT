@@ -11,12 +11,12 @@ from torch_geometric.transforms import Compose
 import datetime, pytz
 
 from core.config.config import Config, parse_config
-from core.models.sbdd4train import SBDDTrainLoop
+from core.models.sbdd_train_loop import SBDDTrainLoop
 from core.callbacks.basic import RecoverCallback, GradientClip, NormalizerCallback, EMACallback
 from core.callbacks.validation_callback import (
-    CondMolGenValidationCallback,
-    MolVisualizationCallback,
-    ReconValidationCallback,
+    ValidationCallback,
+    VisualizeMolAndTrajCallback,
+    ReconLossMonitor,
     DockingTestCallback,
 )
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                 recover_trigger_loss=1e7,
             ),
             NormalizerCallback(normalizer_dict=cfg.data.normalizer_dict),
-            CondMolGenValidationCallback(
+            ValidationCallback(
                 dataset=None,  # TODO: implement CrossDockGen & NewBenchmark
                 atom_decoder=cfg.data.atom_decoder,
                 atom_enc_mode=cfg.data.transform.ligand_atom_mode,
@@ -229,12 +229,12 @@ if __name__ == "__main__":
                 single_bond=True,
                 docking_config=cfg.evaluation.docking_config,
             ),
-            MolVisualizationCallback(
+            VisualizeMolAndTrajCallback(
                 atom_decoder=cfg.data.atom_decoder,
                 colors_dic=cfg.data.colors_dic,
                 radius_dic=cfg.data.radius_dic,
             ),
-            ReconValidationCallback(
+            ReconLossMonitor(
                 val_freq=cfg.train.val_freq,
             ),
             DockingTestCallback(

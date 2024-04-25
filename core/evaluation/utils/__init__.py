@@ -19,11 +19,11 @@ import tempfile
 
 @contextlib.contextmanager
 def timing(msg: str):
-    logging.info("Started %s", msg)
+    print("Started %s", msg)
     tic = time.time()
     yield
     toc = time.time()
-    logging.info("Finished %s in %.3f seconds", msg, toc - tic)
+    print("Finished %s in %.3f seconds", msg, toc - tic)
 
 
 @contextlib.contextmanager
@@ -224,7 +224,8 @@ save molecule and load molecules
 """
 
 
-def save_molist(
+# TODO save sdf
+def save_mol_list(
     path, molecule_list, index2atom, name="molecule", type_one_hot=True,  # self.cfg.dataset.atom_decoder
 ):
     # note t
