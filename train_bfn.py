@@ -69,6 +69,7 @@ def get_dataloader(cfg):
     if cfg.debug:
         debug_set = torch.utils.data.Subset(val_set, [0] * 1600)
         debug_set_val = torch.utils.data.Subset(val_set, [0] * 10)
+        cfg.train.val_freq = 100
         # get debug set val data batch
         debug_batch_val = next(iter(DataLoader(debug_set_val, batch_size=cfg.train.batch_size, shuffle=False)))
         print(f"debug batch val: {debug_batch_val.ligand_filename}")
