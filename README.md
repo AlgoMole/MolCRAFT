@@ -30,18 +30,32 @@ make
 
 You can also build your own environment through `conda env create -f environment.yml`. Here we list the main packages we used, in case you want a different version:
 
-```
-pytorch
-pytorch-lightning
-pyg
-rdkit
-openbabel
-pyyaml
-easydict
-python-lmdb
+```bash
+conda create -n bfnsbdd
+conda activate bfnsbdd
+conda install pytorch pytorch-cuda=11.6 -c pytorch -c nvidia
+conda install lightning -c conda-forge
+conda install pyg -c pyg
+conda install rdkit openbabel pyyaml easydict python-lmdb -c conda-forge
 ```
 
 For evaluation, you will need to install `vina` (affinity), `posecheck` (clash, strain energy, and key interactions), and `spyrmsd` (rmsd).
+
+```bash
+# for vina docking
+pip install meeko==0.1.dev3 scipy pdb2pqr vina==1.2.2 
+python -m pip install git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
+
+# for posecheck
+git clone https://github.com/cch1999/posecheck.git
+cd posecheck
+pip install -e .
+pip install -r requirements.txt
+conda install -c mx reduce
+
+# for spyrmsd
+conda install spyrmsd -c conda-forge
+```
 
 > [!NOTE]
 > - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
@@ -53,9 +67,20 @@ For evaluation, you will need to install `vina` (affinity), `posecheck` (clash, 
 
 ## Folder Structure
 
------
-
-## Code Pipeline
+- /checkpoints: The official checkpoint `last.ckpt`(43M) will be automatically cloned here.
+- /configs: We use yaml file to manage configs for model, directory, data, train, and evaluation. Some of the parameters are provided as input arguments (e.g., `--test_only --no_wandb`), and will be automatically updated and converted to a `config` object.
+- /core: The main code directory.
+  - /callbacks: pytorch-lightning callbacks for validation, docking, etc.
+  - /evaluation: Basic functions for evaluating conformation, affinity, etc.
+  - /models:
+    - bfn_base.py: BFN base class, implemented with Bayesian update and various loss.
+    - bfn4sbdd.py: The score model for SBDD, implemented with SBDD output, loss, sampling.
+    - sbdd_train_loop.py: A `LightningModule`, implemented with `training_step`, `validation_step`, `test_step` and `sampling_step`.
+    - uni_transformer.py: backbone network, same as TargetDiff.
+  - /utils: util functions for reconstructing molecule from point cloud, featurizing protein-ligand data, etc.
+- /logs: The default output folder, containing checkpoints, generated molecules, evaluation results, etc.
+- /test: Evaluation code.
+- sample_for_pocket.py, scripts.mk, train_bfn.py: entry scripts.
 
 -----
 ## Data
