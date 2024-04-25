@@ -26,6 +26,37 @@ make
 > - For customized environment setup, please refer to files `docker/Dockerfile`, `docker/asset/requirements.txt` and `docker/asset/apt_packages.txt`. 
 
 
+### Install via Conda
+
+You can also build your own environment through `conda env create -f environment.yml`. Here we list the main packages we used, in case you want a different version:
+
+```
+pytorch
+pytorch-lightning
+pyg
+rdkit
+openbabel
+pyyaml
+easydict
+python-lmdb
+```
+
+For evaluation, you will need to install `vina` (affinity), `posecheck` (clash, strain energy, and key interactions), and `spyrmsd` (rmsd).
+
+> [!NOTE]
+> - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
+> - We find the latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs. We encourage you to clone PoseCheck code and install by pip (as suggested by their official README). Besides, install commit `57a1938` will reproduce our results.
+> - To resolve posecheck fail in loading protein,
+> - For RMSD fail,
+
+-----
+
+## Folder Structure
+
+-----
+
+## Code Pipeline
+
 -----
 ## Data
 Data used for training / evaluating the model should be put in the `data` folder by default, and accessible in the [data](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder.
