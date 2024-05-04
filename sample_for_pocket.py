@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_discrete_t', action="store_true")
     parser.add_argument('--discrete_steps', type=int, default=1000)
     parser.add_argument('--destination_prediction', action="store_true")
-    parser.add_argument('--sampling_strategy', type=str, default='vanilla') #vanilla or end_back
+    parser.add_argument('--sampling_strategy', type=str, default='end_back_pmf') #vanilla or end_back
 
     parser.add_argument(
         "--time_emb_mode", type=str, default="simple", choices=["simple", "sin", 'rbf', 'rbfnn']
