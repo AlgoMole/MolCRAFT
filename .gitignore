@@ -141,3 +141,6 @@ checkpoints/
 ssh/
 gitconfig
 samples/
+ssh/
+gitconfig
+logs/
