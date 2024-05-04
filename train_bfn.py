@@ -11,12 +11,12 @@ from torch_geometric.transforms import Compose
 import datetime, pytz
 
 from core.config.config import Config, parse_config
-from core.models.sbdd4train import SBDDTrainLoop
+from core.models.sbdd_train_loop import SBDDTrainLoop
 from core.callbacks.basic import RecoverCallback, GradientClip, NormalizerCallback, EMACallback
 from core.callbacks.validation_callback import (
-    CondMolGenValidationCallback,
-    MolVisualizationCallback,
-    ReconValidationCallback,
+    ValidationCallback,
+    VisualizeMolAndTrajCallback,
+    ReconLossMonitor,
     DockingTestCallback,
 )
 
@@ -69,6 +69,7 @@ def get_dataloader(cfg):
     if cfg.debug:
         debug_set = torch.utils.data.Subset(val_set, [0] * 1600)
         debug_set_val = torch.utils.data.Subset(val_set, [0] * 10)
+        cfg.train.val_freq = 100
         # get debug set val data batch
         debug_batch_val = next(iter(DataLoader(debug_set_val, batch_size=cfg.train.batch_size, shuffle=False)))
         print(f"debug batch val: {debug_batch_val.ligand_filename}")
@@ -192,6 +193,7 @@ if __name__ == "__main__":
     parser.add_argument('--pos_init_mode', type=str, default='zero', choices=['zero', 'randn'])
 
     # eval params
+    parser.add_argument('--ckpt_path', type=str, default='best', help='path to the checkpoint')
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--sample_steps", type=int, default=100)
     parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
@@ -263,7 +265,7 @@ if __name__ == "__main__":
             ),
             GradientClip(max_grad_norm=cfg.train.max_grad_norm),  # time consuming
             NormalizerCallback(normalizer_dict=cfg.data.normalizer_dict),
-            CondMolGenValidationCallback(
+            ValidationCallback(
                 dataset=None,  # TODO: implement CrossDockGen & NewBenchmark
                 atom_decoder=cfg.data.atom_decoder,
                 atom_enc_mode=cfg.data.transform.ligand_atom_mode,
@@ -272,12 +274,12 @@ if __name__ == "__main__":
                 docking_config=cfg.evaluation.docking_config,
                 # single_bond=cfg.evaluation.single_bond,  # TODO: check compatibility
             ),
-            MolVisualizationCallback(
+            VisualizeMolAndTrajCallback(
                 atom_decoder=cfg.data.atom_decoder,
                 colors_dic=cfg.data.colors_dic,
                 radius_dic=cfg.data.radius_dic,
             ),
-            ReconValidationCallback(
+            ReconLossMonitor(
                 val_freq=cfg.train.val_freq,
             ),
             DockingTestCallback(
@@ -289,14 +291,12 @@ if __name__ == "__main__":
                 docking_config=cfg.evaluation.docking_config,
             ),
             ModelCheckpoint(
-                # monitor="val/recon_loss",
-                # every_n_train_steps=cfg.train.val_freq,
-                monitor="val/mol_stable",
+                monitor="val/recon_loss",
                 every_n_epochs=cfg.train.ckpt_freq,
                 dirpath=cfg.accounting.checkpoint_dir,
                 filename="epoch{epoch:02d}-val_loss{val/recon_loss:.2f}-mol_stable{val/mol_stable:.2f}-complete{val/completeness:.2f}",
                 save_top_k=5,
-                mode="max",
+                mode="min",
                 auto_insert_metric_name=False,
                 save_last=True,
             ),
@@ -304,9 +304,11 @@ if __name__ == "__main__":
         ],
     )
 
+    # TODO split sample and evaluation
+
     if not cfg.test_only:
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
-        trainer.test(model, dataloaders=val_loader, ckpt_path="last")
+        trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
     else:
-        trainer.test(model, dataloaders=test_loader, ckpt_path="last")
+        trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
 

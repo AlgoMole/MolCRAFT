@@ -16,9 +16,10 @@ import matplotlib
 import wandb
 import copy
 import glob
+import shutil
 
 from core.evaluation.metrics import CondMolGenMetric
-from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_molist
+from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
 from core.evaluation.visualization import visualize, visualize_chain
 from core.utils import transforms as trans
 from core.evaluation.utils import timing
@@ -44,8 +45,23 @@ def center_pos(protein_pos, ligand_pos, batch_protein, batch_ligand, mode='prote
     return protein_pos, ligand_pos, offset
 
 
+# def save_mols(mol_dir, mol_list):
+#     os.makedirs(mol_dir, exist_ok=True)
+#     for i, graph in enumerate(mol_list):                                     
+#         if 'mol' not in graph: continue
+#         mol = graph.mol
+#         mol.SetProp('_Name', graph.ligand_filename)
+#         if raw_evaluation['chem'][i]: 
+#             mol.SetProp('vina_score', str(raw_evaluation['chem'][i]['vina_score']))   
+#             mol.SetProp('vina_minimize', str(raw_evaluation['chem'][i]['vina_minimize']))
+#             if 'vina_dock' in raw_evaluation['chem'][i]:
+#                 mol.SetProp('vina_dock', str(raw_evaluation['chem'][i]['vina_dock']))
+#         with Chem.SDWriter(os.path.join(mol_path, f'{i}.sdf')) as writer:
+#             writer.write(mol)
+
+
 # TODO merge with ReconValidationCallback
-class CondMolGenValidationCallback(Callback):
+class ValidationCallback(Callback):
     def __init__(self, dataset, atom_enc_mode, atom_decoder, atom_type_one_hot, single_bond, docking_config) -> None:
         super().__init__()
         self.dataset = dataset
@@ -89,38 +105,28 @@ class CondMolGenValidationCallback(Callback):
         self, trainer: Trainer, pl_module: LightningModule
     ) -> None:
         super().on_validation_epoch_end(trainer, pl_module)
-        path = pl_module.cfg.accounting.test_outputs_dir
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        if os.path.exists(os.path.join(path, 'val_outputs.pt')):
-            outputs_num = len(glob.glob(os.path.join(path, 'val_outputs*.pt')))
-            version = f'-v{outputs_num}'
-        else:
-            version = ''
-        
+
+        epoch = pl_module.current_epoch
+        path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
+        # clear previous outputs if exists
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path, exist_ok=True)
+
         raw_evaluation = self.metric.compute_raw_evaluation(self.outputs)
-        torch.save(self.outputs, os.path.join(path, f'val_outputs{version}.pt'))
-        torch.save(raw_evaluation, os.path.join(path, f'val_raw_evaluation{version}.pt'))
+        torch.save(self.outputs, os.path.join(path, f'val_outputs.pt'))
+        torch.save(raw_evaluation, os.path.join(path, f'val_raw_evaluation.pt'))
 
-        mol_path = os.path.join(path, f'mols{version}')
-        os.makedirs(mol_path, exist_ok=True)
-        for i, graph in enumerate(self.outputs):                                     
-            if 'mol' not in graph: continue
-            mol = graph.mol                                                     
-            mol.SetProp('_Name', graph.ligand_filename)
-            if raw_evaluation['chem'][i]: 
-                mol.SetProp('vina_score', str(raw_evaluation['chem'][i]['vina_score']))   
-                mol.SetProp('vina_minimize', str(raw_evaluation['chem'][i]['vina_minimize']))
-            with Chem.SDWriter(os.path.join(mol_path, f'{i}.sdf')) as writer:
-                writer.write(mol)
-
+        mol_path = os.path.join(path, f'mols')
+        # TODO
+        
         out_metrics = self.metric.evaluate(self.outputs, raw_evaluation)
         out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
         pl_module.log_dict(out_metrics)
         print(json.dumps(out_metrics, indent=4))
 
 
-class MolVisualizationCallback(Callback):
+class VisualizeMolAndTrajCallback(Callback):
     # here the call back, we save the molecules and also draw the figures also to the wandb.
     def __init__(self, atom_decoder, colors_dic, radius_dic, type_one_hot=False) -> None:
         super().__init__()
@@ -229,7 +235,7 @@ class MolVisualizationCallback(Callback):
                 if not os.path.exists(path):
                     os.makedirs(path, exist_ok=True)
                 # we save the figures here.
-                save_molist(
+                save_mol_list(
                     path=path,
                     molecule_list=self.outputs,
                     index2atom=self.atom_decoder,
@@ -252,7 +258,7 @@ class MolVisualizationCallback(Callback):
                         #     table[0].append(wandb.Image(im))
                         # else:
                         #     table[1].append(wandb.Image(im))
-                    # pl_module.logger.log_table(key="epoch {}".format(epoch),data=table,columns= ['1','2','3','4','5'])
+                    # pl_module.logger.log_table(key="epoch {}".format(epoch), data=table, columns= ['1','2','3','4','5'])
                     pl_module.logger.log_image(key="epoch_{}".format(epoch), images=table)
                     # wandb.log()
                     # update to wandb
@@ -272,7 +278,7 @@ class MolVisualizationCallback(Callback):
                     if not os.path.exists(chain_path):
                         os.makedirs(chain_path, exist_ok=True)
 
-                    save_molist(
+                    save_mol_list(
                         path=chain_path,
                         molecule_list=self.named_chain_outputs[chain_name],
                         index2atom=self.atom_decoder,
@@ -313,7 +319,7 @@ class MolVisualizationCallback(Callback):
         self.on_validation_epoch_end(trainer, pl_module)
 
 
-class ReconValidationCallback(Callback):
+class ReconLossMonitor(Callback):
     # compute the BFN reconstruction loss for validation dataloader.
     def __init__(self, val_freq) -> None:
         super().__init__()
@@ -461,31 +467,19 @@ class DockingTestCallback(Callback):
 
         with timing('docking'):
             path = pl_module.cfg.accounting.test_outputs_dir
-            if not os.path.exists(path):
-                os.makedirs(path, exist_ok=True)
-            if os.path.exists(os.path.join(path, 'outputs.pt')):
-                outputs_num = len(glob.glob(os.path.join(path, 'outputs*.pt')))
-                version = f'-v{outputs_num}'
-            else:
-                version = ''
-            
+            version = 0
+            while os.path.exists(path):
+                version += 1
+                path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
+            print(f'{pl_module.cfg.accounting.test_outputs_dir} already exists, saving to {path}')
+            os.makedirs(path, exist_ok=True)
+
             torch.save(self.outputs, os.path.join(path, f'outputs{version}.pt'))
             raw_evaluation = self.metric.compute_raw_evaluation(self.outputs)
             torch.save(raw_evaluation, os.path.join(path, f'raw_evaluation{version}.pt'))
 
             mol_path = os.path.join(path, f'mols{version}')
-            os.makedirs(mol_path, exist_ok=True)
-            for i, graph in enumerate(self.outputs):                                     
-                if 'mol' not in graph: continue
-                mol = graph.mol                                                     
-                mol.SetProp('_Name', graph.ligand_filename)
-                if raw_evaluation['chem'][i]: 
-                    mol.SetProp('vina_score', str(raw_evaluation['chem'][i]['vina_score']))   
-                    mol.SetProp('vina_minimize', str(raw_evaluation['chem'][i]['vina_minimize']))
-                    if 'vina_dock' in raw_evaluation['chem'][i]:
-                        mol.SetProp('vina_dock', str(raw_evaluation['chem'][i]['vina_dock']))
-                with Chem.SDWriter(os.path.join(mol_path, f'{i}.sdf')) as writer:
-                    writer.write(mol)
+            # TODO            
 
             out_metrics = self.metric.evaluate(self.outputs, raw_evaluation)
             out_metrics = {f'test/{k}': v for k, v in out_metrics.items()}
