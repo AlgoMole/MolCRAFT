@@ -1,6 +1,6 @@
 # MolCRAFT
 
-Official implementation of ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
+Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
 
 ## Environment
@@ -9,8 +9,8 @@ Official implementation of ["MolCRAFT: Structure-Based Drug Design in Continuous
 You will need a host machine with gpu, and a docker with `nvidia-container-runtime` enabled.
 
 > [!TIP]
-> - This repo provide an easy-to-use script to install docker and nvidia-container-runtime, in `./docker` run `sudo ./setup_docker_for_host.sh` to setup your host machine.
-> - You can also refer to [install guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) if you don't have them installed.
+> - This repo provides an easy-to-use script to install docker and nvidia-container-runtime, in `./docker` run `sudo ./setup_docker_for_host.sh` to set up your host machine.
+> - For details, please refer to the [install guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
 
 ### Install via Docker
