@@ -46,10 +46,9 @@ For evaluation, you will need to install `vina` (affinity), `posecheck` (clash, 
 pip install meeko==0.1.dev3 scipy pdb2pqr vina==1.2.2 
 python -m pip install git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
 
-# for posecheck
+# for posecheck evaluation
 git clone https://github.com/cch1999/posecheck.git
 cd posecheck
-# the latest version contains some bugs, change to previous version
 git checkout 57a1938
 pip install -e .
 pip install -r requirements.txt
@@ -61,20 +60,19 @@ conda install spyrmsd -c conda-forge
 
 > [!NOTE]
 > - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
-> - The latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs, and installing commit `57a1938` will reproduce our results.
-> - Posecheck may fail to load protein when multiple processes access the same pdb file. A hot fix is by inserting these lines after posecheck/utils/loading.py line 60:
+> - Our results are based on the commit `57a1938` of [PoseCheck](https://github.com/cch1999/posecheck), a version before some major updates and significant changes of methods in the package.
+> - When PoseCheck fails to load protein when multiple processes access the same pdb file, a hot fix is done by this code snippet in `posecheck/utils/loading.py` line 60:
 > ``` python
 > while os.path.exists(tmp_path):
 >     hash_code = str(hash(tmp_path))[:4]
 >     tmp_path = tmp_path[:-8] + '_' + hash_code + '_tmp.pdb'
 > ```
-> - For RMSD fail,
 
 -----
 
 ## Folder Structure
 
-- /checkpoints: The official checkpoint `last.ckpt`(43M) will be automatically cloned here.
+- /checkpoints: The official checkpoint `last.ckpt` (43M) will be automatically cloned here.
 - /configs: We use yaml file to manage configs for model, directory, data, train, and evaluation. Some of the parameters are provided as input arguments (e.g., `--test_only --no_wandb`), and will be automatically updated and converted to a `config` object.
 - /core: The main code directory.
   - /callbacks: pytorch-lightning callbacks for validation, docking, etc.
@@ -158,3 +156,14 @@ For PoseCheck (strain energy, clashes) and other conformational results (bond le
 We provide samples for all SBDD baselines in the [sample](https://drive.google.com/drive/folders/1A3Mthm9ksbfUnMCe5T2noGsiEV1RfChH?usp=sharing) Google Drive folder.
 
 You may download the `all_samples.tar.gz` and then `tar xzvf all_samples.tar.gz`, which extracts all the pt files into `samples` folder for evaluation.
+
+## Citation
+
+```
+@article{qu2024molcraft,
+  title={MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space},
+  author={Qu, Yanru and Qiu, Keyue and Song, Yuxuan and Gong, Jingjing and Han, Jiawei and Zheng, Mingyue and Zhou, Hao and Ma, Wei-Ying},
+  journal={arXiv preprint arXiv:2404.12141},
+  year={2024}
+}
+```
