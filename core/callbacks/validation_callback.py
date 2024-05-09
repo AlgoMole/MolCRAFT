@@ -106,6 +106,9 @@ class ValidationCallback(Callback):
     ) -> None:
         super().on_validation_epoch_end(trainer, pl_module)
 
+        # for idx, res in enumerate(self.outputs):
+        #     print(idx, res.keys())
+
         epoch = pl_module.current_epoch
         path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
         # clear previous outputs if exists
@@ -269,7 +272,7 @@ class VisualizeMolAndTrajCallback(Callback):
                 columns = list(self.named_chain_outputs.keys())
                 chain_gifs = []
 
-                table = wandb.Table(columns=columns)
+                # table = wandb.Table(columns=columns)
                 for chain_name in columns:     
                     chain_path = os.path.join(
                         pl_module.cfg.accounting.generated_mol_dir, str(epoch), f"{chain_name}_chain"
@@ -298,7 +301,7 @@ class VisualizeMolAndTrajCallback(Callback):
                 pl_module.logger.log_table(
                     key="epoch_{}".format(epoch), data=[chain_gifs], columns=columns
                 )
-    
+
     def on_test_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self.on_validation_start(trainer, pl_module)
 
@@ -397,16 +400,19 @@ class ReconLossMonitor(Callback):
                         sum_loss_pos += float(c_loss.sum())
                         sum_loss_type += float(d_loss.sum())
 
+                recon_loss = {
+                    "val/recon_loss": sum_loss / sum_batches,
+                    "val/recon_loss_pos": sum_loss_pos / sum_batches,
+                    "val/recon_loss_type": sum_loss_type / sum_batches,
+                }
                 # log the mean reconstruction loss
-                pl_module.log_dict({
-                        "val/recon_loss": sum_loss / sum_batches,
-                        "val/recon_loss_pos": sum_loss_pos / sum_batches,
-                        "val/recon_loss_type": sum_loss_type / sum_batches,
-                    }, 
+                pl_module.log_dict(
+                    recon_loss, 
                     on_step=True,
                     prog_bar=True, 
                     batch_size=pl_module.cfg.train.batch_size,
                 )
+                print(json.dumps(recon_loss, indent=4))
                 # print(f"step {trainer.global_step}: recon_loss: {sum_loss / sum_batches:.4f}, recon_loss_pos: {sum_loss_pos / sum_batches:.4f}, recon_loss_type: {sum_loss_type / sum_batches:.4f}")
                 pl_module.dynamics.train()
 

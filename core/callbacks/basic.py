@@ -78,7 +78,7 @@ class GradientClip(Callback):
                 'max_grad_norm': max_grad_norm,
             },
             on_step=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
             batch_size=pl_module.cfg.train.batch_size,
         )
