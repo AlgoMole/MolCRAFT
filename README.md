@@ -14,6 +14,7 @@ You will need a host machine with gpu, and a docker with `nvidia-container-runti
 
 
 ### Install via Docker
+We highly recommend you to set up the environment via docker, since all you need to do is a simple `make` command.
 ```bash
 cd ./docker
 make
