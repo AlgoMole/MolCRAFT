@@ -122,13 +122,20 @@ class SBDDTrainLoop(pl.LightningModule):
         self.log_dict(
             {
                 'lr': self.get_last_lr(),
-                'loss': loss.item(), 
+                'loss': loss.item(),
+            },
+            on_step=True,
+            prog_bar=True,
+            batch_size=self.cfg.train.batch_size,
+        )
+        self.log_dict(
+            {
                 'loss_pos': c_loss.mean().item(), 
                 'loss_type': d_loss.mean().item(),
                 'loss_c_ratio': c_loss.mean().item() / loss.item(),
             },
             on_step=True,
-            prog_bar=True,
+            prog_bar=False,
             batch_size=self.cfg.train.batch_size,
         )
 
@@ -151,8 +158,11 @@ class SBDDTrainLoop(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        return self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref')
-
+        out_data_list = []
+        for _ in range(5):
+            out_data_list.append(self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref'))
+        return out_data_list
+    
     def test_step(self, batch, batch_idx):
         # TODO change order, samples of the same pocket should be together, reduce protein loading
         out_data_list = []
@@ -242,15 +252,19 @@ class SBDDTrainLoop(pl.LightningModule):
         pred_aromatic = trans.is_aromatic_from_index(
             pred_v, mode=self.cfg.data.transform.ligand_atom_mode
         ) # List[bool]
+
+        # print('[DEBUG]', num_graphs, len(ligand_cum_atoms))
         
         results = []
-        for i in range(num_graphs):
-            pos = pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64)
-            atom_types = pred_atom_type[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]]
-            is_aromatic = pred_aromatic[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]]
+        for i in range(num_graphs):            
             try:
-                mol = reconstruct.reconstruct_from_generated(pos, atom_types, is_aromatic)
+                mol = reconstruct.reconstruct_from_generated(
+                    pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64),
+                    pred_atom_type[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
+                    pred_aromatic[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
+                )
             except reconstruct.MolReconsError:
+                # print('[DEBUG]', i, 'failed')
                 mol = None
             results.append(mol)
         

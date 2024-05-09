@@ -195,9 +195,9 @@ class CondMolGenMetric(object):
                         # calc mean while excluding positive values
                         metrics[k2 + '_median'] = np.median(k_list)
                         metrics[k2 + '_mean'] = np.mean(k_list)
-                        k_list_filtered = [v2 for v2 in k_list if v2 < 0]
-                        metrics[k2 + '_mean_filter'] = np.mean(k_list_filtered)
-                        metrics[k2 + '_eval_success'] = len(k_list_filtered) / len(generated)
+                        k_list_neg = [v2 for v2 in k_list if v2 < 0]
+                        metrics[k2 + '_mean_neg'] = np.mean(k_list_neg)
+                        metrics[k2 + '_neg_ratio'] = len(k_list_neg) / len(generated)
             else:
                 raise ValueError(f"Unknown type of {k}: {type(v)}")
         

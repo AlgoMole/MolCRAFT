@@ -67,7 +67,7 @@ def get_dataloader(cfg):
     collate_exclude_keys = ["ligand_nbh_list"]
     # size-1 debug set
     if cfg.debug:
-        debug_set = torch.utils.data.Subset(val_set, [0] * 1600)
+        debug_set = torch.utils.data.Subset(val_set, [0] * 800)
         debug_set_val = torch.utils.data.Subset(val_set, [0] * 10)
         cfg.train.val_freq = 100
         # get debug set val data batch
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     _args = parser.parse_args()
     cfg = Config(**_args.__dict__)
-    seed_everything(cfg.seed)
+    seed_everything(cfg.seed, workers=True)
 
     logging_level = {
         "info": logging.INFO,
@@ -250,6 +250,7 @@ if __name__ == "__main__":
     model = SBDDTrainLoop(config=cfg)
 
     trainer = pl.Trainer(
+        # deterministic=True,
         default_root_dir=cfg.accounting.logdir,
         max_epochs=cfg.train.epochs,
         check_val_every_n_epoch=cfg.train.ckpt_freq,
@@ -291,12 +292,12 @@ if __name__ == "__main__":
                 docking_config=cfg.evaluation.docking_config,
             ),
             ModelCheckpoint(
-                monitor="val/recon_loss",
+                monitor="val/completeness",
                 every_n_epochs=cfg.train.ckpt_freq,
                 dirpath=cfg.accounting.checkpoint_dir,
-                filename="epoch{epoch:02d}-val_loss{val/recon_loss:.2f}-mol_stable{val/mol_stable:.2f}-complete{val/completeness:.2f}",
-                save_top_k=5,
-                mode="min",
+                filename="epoch{epoch:02d}-val_loss{val/recon_loss:.2f}-mol_stable{val/mol_stable:.2f}-complete{val/completeness:.2f}-vina_score{val/vina_score_mean:.2f}",
+                save_top_k=-1,
+                mode="max",
                 auto_insert_metric_name=False,
                 save_last=True,
             ),
@@ -308,6 +309,7 @@ if __name__ == "__main__":
 
     if not cfg.test_only:
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+        # ckpt_path can be 'best', 'last', or a specific path
         trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
     else:
         trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)

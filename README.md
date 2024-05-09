@@ -24,7 +24,7 @@ make
 > - If `make` exits with error messages with pip, try `make` again in case of any network connection timeout. 
 > - Once `make` succeeds, note that exiting from container wound't stop it, nor the tmux sessions running within. To enter an existing container, simply run `make` again. If you need to stop this container, run `make kill`.
 > - For customized environment setup, please refer to files `docker/Dockerfile`, `docker/asset/requirements.txt` and `docker/asset/apt_packages.txt`. 
-
+> - If your bash does not highlight properly, try `sh -c "$(wget https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)"` to reinstall zsh template.
 
 ### Install via Conda
 
@@ -49,6 +49,8 @@ python -m pip install git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py
 # for posecheck
 git clone https://github.com/cch1999/posecheck.git
 cd posecheck
+# the latest version contains some bugs, change to previous version
+git checkout 57a1938
 pip install -e .
 pip install -r requirements.txt
 conda install -c mx reduce
@@ -59,8 +61,13 @@ conda install spyrmsd -c conda-forge
 
 > [!NOTE]
 > - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
-> - We find the latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs. We encourage you to clone PoseCheck code and install by pip (as suggested by their official README). Besides, install commit `57a1938` will reproduce our results.
-> - To resolve posecheck fail in loading protein,
+> - The latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs, and installing commit `57a1938` will reproduce our results.
+> - Posecheck may fail to load protein when multiple processes access the same pdb file. A hot fix is by inserting these lines after posecheck/utils/loading.py line 60:
+> ``` python
+> while os.path.exists(tmp_path):
+>     hash_code = str(hash(tmp_path))[:4]
+>     tmp_path = tmp_path[:-8] + '_' + hash_code + '_tmp.pdb'
+> ```
 > - For RMSD fail,
 
 -----
@@ -96,7 +103,7 @@ By default, We transform the lmdb further into the featurized dataset as `crossd
 
 ```yaml
 data:
-  name: pl_tr # [pl, pl_tr] where tr means transformed
+  name: pl_tr # [pl, pl_tr] where tr means offline-transformed
 ```
 
 ---
@@ -109,6 +116,12 @@ python train_bfn.py --exp_name {EXP} --revision {REVISION}
 where the default values should be set the same as:
 ```bash
 python train_bfn.py --sigma1_coord 0.03 --beta1 1.5 --lr 5e-4 --time_emb_dim 1 --epochs 15 --max_grad_norm Q --destination_prediction True --use_discrete_t True --num_samples 10 --sampling_strategy end_back_pmf
+```
+
+### Testing
+For quick evaluation of the official checkpoint, refer to `make evaluate` in `scripts.mk`:
+```bash
+python train_bfn.py --test_only --no_wandb --ckpt_path ./checkpoints/last.ckpt
 ```
 
 ### Debugging
