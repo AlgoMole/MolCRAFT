@@ -32,8 +32,8 @@ make
 You can also build your own environment through `conda env create -f environment.yml`. Here we list the main packages we used, in case you want a different version:
 
 ```bash
-conda create -n bfnsbdd
-conda activate bfnsbdd
+conda create -n molcraft
+conda activate molcraft
 conda install pytorch pytorch-cuda=11.6 -c pytorch -c nvidia
 conda install lightning -c conda-forge
 conda install pyg -c pyg
