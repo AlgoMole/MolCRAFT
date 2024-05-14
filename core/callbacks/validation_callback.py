@@ -409,7 +409,7 @@ class ReconLossMonitor(Callback):
                 pl_module.log_dict(
                     recon_loss, 
                     on_step=True,
-                    prog_bar=True, 
+                    prog_bar=False, 
                     batch_size=pl_module.cfg.train.batch_size,
                 )
                 print(json.dumps(recon_loss, indent=4))

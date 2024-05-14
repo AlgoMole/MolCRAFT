@@ -101,16 +101,6 @@ class CondMolGenMetric(object):
                         prefix = "Dock testing"
                     else:
                         prefix = "Validating"
-                    # if largest_mol.GetNumAtoms() < 0.8 * mol.GetNumAtoms():
-                    #     print(f"{prefix}: {graph.ligand_filename} has {len(mol_frags)} fragments. Atom number: {largest_mol.GetNumAtoms()} (originally {mol.GetNumAtoms()}). Skipped evaluation.")
-                    #     chem_list.append(chem_results)
-                    #     continue
-                    # else:
-                    #     print(f"{prefix}: {graph.ligand_filename} has {len(mol_frags)} fragments. Atom number: {largest_mol.GetNumAtoms()} (originally {mol.GetNumAtoms()}). Skipped evaluation.") # Using largest fragment for evaluation.")
-                    #     chem_list.append(chem_results)
-                    #     mol = largest_mol
-                    #     continue
-                    print(f"{prefix}: {graph.ligand_filename} has {len(mol_frags)} fragments. Atom number: {largest_mol.GetNumAtoms()} (originally {mol.GetNumAtoms()}). Skipped evaluation.")
                     chem_list.append(chem_results)
                     continue
                     
