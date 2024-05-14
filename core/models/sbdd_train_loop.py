@@ -160,7 +160,7 @@ class SBDDTrainLoop(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         out_data_list = []
         for _ in range(5):
-            out_data_list.append(self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref'))
+            out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref'))
         return out_data_list
     
     def test_step(self, batch, batch_idx):

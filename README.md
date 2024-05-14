@@ -2,6 +2,7 @@
 
 Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
+Check our demo: coming soon
 
 ## Environment
 
@@ -62,32 +63,59 @@ conda install spyrmsd -c conda-forge
 > [!NOTE]
 > - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
 > - The latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs, and installing commit `57a1938` will reproduce our results.
-> - Posecheck may fail to load protein when multiple processes access the same pdb file. A hot fix is by inserting these lines after posecheck/utils/loading.py line 60:
-> ``` python
-> while os.path.exists(tmp_path):
->     hash_code = str(hash(tmp_path))[:4]
->     tmp_path = tmp_path[:-8] + '_' + hash_code + '_tmp.pdb'
-> ```
-> - For RMSD fail,
+
+Posecheck may fail to load protein when multiple processes access the same pdb file. A hot fix is by preprocessing all pdb files in advance:
+```python
+# in posecheck/posecheck/utils/loading.py:
+# change line 62-68 to
+...
+    if not os.path.exists(tmp_path):
+        # Call reduce to make tmp PDB with waters
+        reduce_command = f"{reduce_path} -NOFLIP  {pdb_path} -Quiet > {tmp_path}"
+        subprocess.run(reduce_command, shell=True)
+
+    # Load the protein from the temporary PDB file
+    prot = load_protein_prolif(tmp_path)
+    # os.remove(tmp_path)
+...
+
+# adding the following 2 functions
+# preprocess pdb files
+def prepare_protein_from_pdb(pdb_path_list: list[str], reduce_path: str = REDUCE_PATH):
+    for pdb_path in pdb_path_list:
+        tmp_path = pdb_path.split(".pdb")[0] + "_tmp.pdb"
+        # Call reduce to make tmp PDB with waters
+        reduce_command = f"{reduce_path} -NOFLIP  {pdb_path} -Quiet > {tmp_path}"
+        subprocess.run(reduce_command, shell=True)
+    return
+
+# after pose check, you can remove all tmp files by hand:
+def remove_protein_tmp_file(pdb_path_list: list[str]):
+    for pdb_path in pdb_path_list:
+        tmp_path = pdb_path.split(".pdb")[0] + "_tmp.pdb"
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    return
+```
 
 -----
 
 ## Folder Structure
 
-- /checkpoints: The official checkpoint `last.ckpt`(43M) will be automatically cloned here.
-- /configs: We use yaml file to manage configs for model, directory, data, train, and evaluation. Some of the parameters are provided as input arguments (e.g., `--test_only --no_wandb`), and will be automatically updated and converted to a `config` object.
-- /core: The main code directory.
-  - /callbacks: pytorch-lightning callbacks for validation, docking, etc.
-  - /evaluation: Basic functions for evaluating conformation, affinity, etc.
-  - /models:
-    - bfn_base.py: BFN base class, implemented with Bayesian update and various loss.
-    - bfn4sbdd.py: The score model for SBDD, implemented with SBDD output, loss, sampling.
-    - sbdd_train_loop.py: A `LightningModule`, implemented with `training_step`, `validation_step`, `test_step` and `sampling_step`.
-    - uni_transformer.py: backbone network, same as TargetDiff.
-  - /utils: util functions for reconstructing molecule from point cloud, featurizing protein-ligand data, etc.
-- /logs: The default output folder, containing checkpoints, generated molecules, evaluation results, etc.
-- /test: Evaluation code.
-- sample_for_pocket.py, scripts.mk, train_bfn.py: entry scripts.
+- `/checkpoints`: The official checkpoint `last.ckpt`(43M) will be automatically cloned here.
+- `/configs`: We use yaml file to manage configs for model, directory, data, train, and evaluation. Some of the parameters are provided as input arguments (e.g., `--test_only --no_wandb`), and will be automatically updated and converted to a `config` object.
+- `/core`: The main code directory.
+  - `/callbacks`: pytorch-lightning callbacks for validation, docking, etc.
+  - `/evaluation`: Basic functions for evaluating conformation, affinity, etc.
+  - `/models`:
+    - `bfn_base.py`: BFN base class, implemented with Bayesian update and various loss.
+    - `bfn4sbdd.py`: The score model for SBDD, implemented with SBDD output, loss, sampling.
+    - `sbdd_train_loop.py`: A `LightningModule`, implemented with `training_step`, `validation_step`, `test_step` and `sampling_step`.
+    - `uni_transformer.py`: backbone network, same as TargetDiff.
+  - `/utils`: util functions for reconstructing molecule from point cloud, featurizing protein-ligand data, etc.
+- `/logs`: The default output folder, containing checkpoints, generated molecules, evaluation results, etc.
+- `/test`: Evaluation code.
+- `sample_for_pocket.py`, scripts.mk, train_bfn.py: entry scripts.
 
 -----
 ## Data
