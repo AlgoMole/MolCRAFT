@@ -444,7 +444,7 @@ class BFN4SBDDScoreModel(BFNBase):
         batch_ligand,
         n_nodes,  # B
         sample_steps=1000,
-        desc='Val',
+        desc='',
         ligand_pos=None,  # for debug
     ):
         """
@@ -496,7 +496,7 @@ class BFN4SBDDScoreModel(BFNBase):
         # TODO: debug
         mu_pos_t = mu_pos_t[batch_ligand]
         theta_h_t = theta_h_t[batch_ligand]
-        for i in trange(1, sample_steps + 1, desc=f'{desc}-Sampling'):
+        for i in trange(1, sample_steps + 1, desc=f'{desc}'):
             t = torch.ones((n_nodes, 1)).to(self.device) * (i - 1) / sample_steps
             if not self.use_discrete_t and not self.destination_prediction:
                 t = torch.clamp(t, min=self.t_min)

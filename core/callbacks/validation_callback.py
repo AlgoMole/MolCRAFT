@@ -18,11 +18,12 @@ import copy
 import glob
 import shutil
 
-from core.evaluation.metrics import CondMolGenMetric
+from core.evaluation.metrics import CondMolGenMetric, ModelResults
 from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
 from core.evaluation.visualization import visualize, visualize_chain
 from core.utils import transforms as trans
 from core.evaluation.utils import timing
+from core.utils.reconstruct import reconstruct_from_generated, MolReconError
 
 # this file contains the model which we used to visualize the
 
@@ -45,19 +46,51 @@ def center_pos(protein_pos, ligand_pos, batch_protein, batch_ligand, mode='prote
     return protein_pos, ligand_pos, offset
 
 
-# def save_mols(mol_dir, mol_list):
-#     os.makedirs(mol_dir, exist_ok=True)
-#     for i, graph in enumerate(mol_list):                                     
-#         if 'mol' not in graph: continue
-#         mol = graph.mol
-#         mol.SetProp('_Name', graph.ligand_filename)
-#         if raw_evaluation['chem'][i]: 
-#             mol.SetProp('vina_score', str(raw_evaluation['chem'][i]['vina_score']))   
-#             mol.SetProp('vina_minimize', str(raw_evaluation['chem'][i]['vina_minimize']))
-#             if 'vina_dock' in raw_evaluation['chem'][i]:
-#                 mol.SetProp('vina_dock', str(raw_evaluation['chem'][i]['vina_dock']))
-#         with Chem.SDWriter(os.path.join(mol_path, f'{i}.sdf')) as writer:
-#             writer.write(mol)
+def reconstruct_mol_and_filter_invalid(out_list):
+    results = []
+    n_recon, n_complete, n_valid = 0, 0, 0
+    n_total = len(out_list)
+
+    for item in out_list:
+        ligand_filename, pos, atom_type, is_aromatic = item.ligand_filename, item.pos, item.atom_type, item.is_aromatic
+        protein_pos, protein_v = item.protein_pos, item.protein_atom_feature
+        
+        pos = pos.cpu().numpy().astype('float64')
+        atom_type = atom_type.cpu().numpy().astype('int32')
+        is_aromatic = is_aromatic.cpu().numpy().astype('bool')
+        protein_pos = protein_pos.cpu().numpy().astype('float64')
+
+        res = {
+            'ligand_filename': ligand_filename, 
+            'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
+            'protein_pos': protein_pos,
+        }
+        # TODO turn off basic_mode = False to use predicted aromaticity
+        try:
+            mol = reconstruct_from_generated(pos, atom_type, is_aromatic, basic_mode=True)
+            n_recon += 1
+            res['mol'] = mol
+
+            Chem.SanitizeMol(mol)
+            smiles = Chem.MolToSmiles(mol)
+            complete = smiles is not None and '.' not in smiles
+            validity = smiles is not None
+
+            n_complete += int(complete)
+            n_valid += int(validity)
+            res['smiles'] = smiles                    
+            res['complete'] = complete
+            res['validity'] = validity
+            results.append(res)
+        except Exception as e:
+            continue
+
+    results = ModelResults('bfn', 'molcraft', results)
+    return results, {
+        'recon_success': n_recon / n_total,
+        'completeness': n_complete / n_total,
+        'validity': n_valid / n_total,
+    }
 
 
 # TODO merge with ReconValidationCallback
@@ -106,8 +139,11 @@ class ValidationCallback(Callback):
     ) -> None:
         super().on_validation_epoch_end(trainer, pl_module)
 
-        # for idx, res in enumerate(self.outputs):
-        #     print(idx, res.keys())
+        results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
+
+        if len(results) == 0:
+            print('skip validation, no mols are valid & complete')
+            return
 
         epoch = pl_module.current_epoch
         path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
@@ -115,15 +151,10 @@ class ValidationCallback(Callback):
         if os.path.exists(path):
             shutil.rmtree(path)
         os.makedirs(path, exist_ok=True)
-
-        raw_evaluation = self.metric.compute_raw_evaluation(self.outputs)
-        torch.save(self.outputs, os.path.join(path, f'val_outputs.pt'))
-        torch.save(raw_evaluation, os.path.join(path, f'val_raw_evaluation.pt'))
-
-        mol_path = os.path.join(path, f'mols')
-        # TODO
+        torch.save(results, os.path.join(path, f'generated.pt'))
         
-        out_metrics = self.metric.evaluate(self.outputs, raw_evaluation)
+        out_metrics = self.metric.evaluate(results)
+        out_metrics.update(recon_dict)
         out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
         pl_module.log_dict(out_metrics)
         print(json.dumps(out_metrics, indent=4))
@@ -471,23 +502,26 @@ class DockingTestCallback(Callback):
     ) -> None:
         super().on_test_epoch_end(trainer, pl_module)
 
-        with timing('docking'):
-            path = pl_module.cfg.accounting.test_outputs_dir
-            version = 0
-            while os.path.exists(path):
-                version += 1
-                path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
-            print(f'{pl_module.cfg.accounting.test_outputs_dir} already exists, saving to {path}')
-            os.makedirs(path, exist_ok=True)
+        results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
 
-            torch.save(self.outputs, os.path.join(path, f'outputs{version}.pt'))
-            raw_evaluation = self.metric.compute_raw_evaluation(self.outputs)
-            torch.save(raw_evaluation, os.path.join(path, f'raw_evaluation{version}.pt'))
+        if len(results) == 0:
+            print('skip validation, no mols are valid & complete')
+            return
 
-            mol_path = os.path.join(path, f'mols{version}')
-            # TODO            
+        path = pl_module.cfg.accounting.test_outputs_dir
+        version = 0
+        while os.path.exists(path):
+            version += 1
+            path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
+        print(f'{pl_module.cfg.accounting.test_outputs_dir} already exists, saving to {path}')
+        os.makedirs(path, exist_ok=True)
+        torch.save(results, os.path.join(path, f'generated.pt'))
 
-            out_metrics = self.metric.evaluate(self.outputs, raw_evaluation)
-            out_metrics = {f'test/{k}': v for k, v in out_metrics.items()}
-            print(json.dumps(out_metrics, indent=4))
-            pl_module.log_dict(out_metrics)
+        bad_case_dir = os.path.join(path, 'bad_cases')
+        os.makedirs(path, exist_ok=True)
+
+        out_metrics = self.metric.evaluate(results, bad_case_dir)
+        out_metrics.update(recon_dict)
+        out_metrics = {f'test/{k}': v for k, v in out_metrics.items()}
+        pl_module.log_dict(out_metrics)
+        print(json.dumps(out_metrics, indent=4))
