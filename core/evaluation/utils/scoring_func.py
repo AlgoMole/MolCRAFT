@@ -72,32 +72,20 @@ def get_logp(mol):
 
 
 def get_chem(mol):
-    qed_score = qed(mol)
-    sa_score = compute_sa_score(mol)
-    # TODO ring_size will cause error below, fix later
-    # File "/sharefs/kevin/project/BFN4SBDD/core/callbacks/validation_callback.py", line 90, in on_validation_epoch_end
-    #     out_metrics = self.metric.evaluate(self.outputs)
-    # File "/sharefs/kevin/project/BFN4SBDD/core/evaluation/metrics.py", line 197, in evaluate
-    #     metrics[k2 + '_mean'] = np.mean(k_list)
-    # File "/opt/conda/lib/python3.9/site-packages/numpy/core/fromnumeric.py", line 3504, in mean
-    #     return _methods._mean(a, axis=axis, dtype=dtype,
-    # File "/opt/conda/lib/python3.9/site-packages/numpy/core/_methods.py", line 131, in _mean
-    #     ret = ret / rcount
-    # TypeError: unsupported operand type(s) for /: 'Counter' and 'int'
-
-    # logp_score = get_logp(mol)
-    # lipinski_score = obey_lipinski(mol)
-    # ring_info = mol.GetRingInfo()
-    # ring_size = Counter([len(r) for r in ring_info.AtomRings()])
-    # hacc_score = Lipinski.NumHAcceptors(mol)
-    # hdon_score = Lipinski.NumHDonors(mol)
-
+    qed_score = sa_score = logp_score = lipinski_score = np.nan
+    try:
+        qed_score = qed(mol)
+        sa_score = compute_sa_score(mol)
+        lipinski_score = obey_lipinski(mol)
+        logp_score = get_logp(mol)
+    except Exception as e:
+        print(f'[CHEM FAIL] {e}')
+    
     return {
         'qed': qed_score,
         'sa': sa_score,
-        # 'logp': logp_score,
-        # 'lipinski': lipinski_score,
-        # 'ring_size': ring_size
+        'lipinski': lipinski_score,
+        'logp': logp_score,            
     }
 
 

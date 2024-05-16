@@ -194,14 +194,31 @@ if __name__ == "__main__":
 
     # eval params
     parser.add_argument('--ckpt_path', type=str, default='best', help='path to the checkpoint')
-    parser.add_argument("--num_samples", type=int, default=10)
+    parser.add_argument("--num_samples", type=int, default=5)
     parser.add_argument("--sample_steps", type=int, default=100)
     parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
     parser.add_argument("--visual_chain", action="store_true")
     parser.add_argument("--docking_mode", type=str, default="vina_score", choices=['vina_score', 'vina_dock'])
 
     _args = parser.parse_args()
+    if _args.ckpt_path.lstrip('./') == 'checkpoints/last.ckpt':
+        _args.exp_name = 'official'
+        _args.revision = 'default'
+    else:
+        print('trying to automatically parse experiment folder...')
+        try:
+            *_, exp_name, revision, _, ckpt_fn = _args.ckpt_path.split('/')
+            _args.exp_name = exp_name
+            _args.revision = revision
+            print(f'change log dir to **/{exp_name}/{revision}')
+        except Exception as e:
+            pass
+
     cfg = Config(**_args.__dict__)
+    if not os.path.exists(cfg.accounting.logdir):
+        os.makedirs(cfg.accounting.logdir, exist_ok=True)
+        shutil.copyfile('./configs/default.yaml', cfg.accounting.dump_config_path)
+
     seed_everything(cfg.seed, workers=True)
 
     logging_level = {
@@ -275,11 +292,11 @@ if __name__ == "__main__":
                 docking_config=cfg.evaluation.docking_config,
                 # single_bond=cfg.evaluation.single_bond,  # TODO: check compatibility
             ),
-            VisualizeMolAndTrajCallback(
-                atom_decoder=cfg.data.atom_decoder,
-                colors_dic=cfg.data.colors_dic,
-                radius_dic=cfg.data.radius_dic,
-            ),
+            # VisualizeMolAndTrajCallback(
+            #     atom_decoder=cfg.data.atom_decoder,
+            #     colors_dic=cfg.data.colors_dic,
+            #     radius_dic=cfg.data.radius_dic,
+            # ),
             ReconLossMonitor(
                 val_freq=cfg.train.val_freq,
             ),
@@ -292,12 +309,12 @@ if __name__ == "__main__":
                 docking_config=cfg.evaluation.docking_config,
             ),
             ModelCheckpoint(
-                monitor="val/completeness",
+                monitor="val/recon_loss",
                 every_n_epochs=cfg.train.ckpt_freq,
                 dirpath=cfg.accounting.checkpoint_dir,
                 filename="epoch{epoch:02d}-val_loss{val/recon_loss:.2f}-mol_stable{val/mol_stable:.2f}-complete{val/completeness:.2f}-vina_score{val/vina_score_mean:.2f}",
                 save_top_k=-1,
-                mode="max",
+                mode="min",
                 auto_insert_metric_name=False,
                 save_last=True,
             ),

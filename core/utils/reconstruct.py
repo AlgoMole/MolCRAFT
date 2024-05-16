@@ -14,7 +14,7 @@ from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
 
 
-class MolReconsError(Exception):
+class MolReconError(Exception):
     pass
 
 
@@ -298,7 +298,7 @@ def convert_ob_mol_to_rd_mol(ob_mol, struct=None):
     try:
         AllChem.SanitizeMol(rd_mol, AllChem.SANITIZE_ALL ^ AllChem.SANITIZE_KEKULIZE)
     except:
-        raise MolReconsError()
+        raise MolReconError()
     # try:
     #     AllChem.SanitizeMol(rd_mol,AllChem.SANITIZE_ALL^AllChem.SANITIZE_KEKULIZE)
     # except: # mtr22 - don't assume mols will pass this
@@ -490,6 +490,13 @@ def reconstruct_from_generated(xyz, atomic_nums, aromatic=None, basic_mode=True)
     else:
         indicators = aromatic
 
+    if isinstance(xyz, np.ndarray):
+        xyz = xyz.tolist()
+    if isinstance(atomic_nums, np.ndarray):
+        atomic_nums = atomic_nums.tolist()
+    if isinstance(aromatic, np.ndarray):
+        aromatic = aromatic.tolist()
+
     mol, atoms = make_obmol(xyz, atomic_nums)
     fixup(atoms, mol, indicators)
 
@@ -538,6 +545,6 @@ def reconstruct_from_generated(xyz, atomic_nums, aromatic=None, basic_mode=True)
         rd_mol = postprocess_rd_mol_1(rd_mol)
         rd_mol = postprocess_rd_mol_2(rd_mol)
     except:
-        raise MolReconsError()
+        raise MolReconError()
 
     return rd_mol

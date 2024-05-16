@@ -162,8 +162,8 @@ def build_xae_molecule(positions, atom_type, atom_decoder, single_bond=False):
 def check_stability(
     positions,
     atom_type,
-    atom_decoder,
-    type_one_hot=True,
+    # atom_decoder,
+    # type_one_hot=True,
     single_bond=False,
     debug=False,
     with_h=False,
@@ -171,16 +171,23 @@ def check_stability(
     assert len(positions.shape) == 2
     assert positions.shape[1] == 3
     # TODO: TargetDiff
-    if type_one_hot:
-        assert len(atom_type.shape) == 2, atom_type.shape
-        assert atom_type.shape[1] == len(atom_decoder), atom_type.shape
-        atom_type = torch.argmax(atom_type, dim=1)
-    else:
-        assert len(atom_type.shape) == 1, atom_type.shape
-        # TODO: make atom_decoder list-like so as to avoid conversion
-        atom_type = atom_type.detach().cpu().numpy()
+    # if type_one_hot:
+    #     assert len(atom_type.shape) == 2, atom_type.shape
+    #     assert atom_type.shape[1] == len(atom_decoder), atom_type.shape
+    #     atom_type = torch.argmax(atom_type, dim=1)
+    # else:
+    #     assert len(atom_type.shape) == 1, atom_type.shape
+    #     # TODO: make atom_decoder list-like so as to avoid conversion
+    #     atom_type = atom_type.detach().cpu().numpy()
 
+    positions = torch.Tensor(positions)
     distances = torch.cdist(positions, positions, p=2)
+    ptable = Chem.GetPeriodicTable()
+    atom_type = [ptable.GetElementSymbol(int(t)) for t in atom_type]
+
+    # from scipy.spatial.distance import pdist
+    # distances = pdist(positions, metric='euclidean')
+
     num_atoms = positions.shape[0]
 
     nr_bonds = np.zeros(num_atoms, dtype="int")
@@ -188,7 +195,8 @@ def check_stability(
     for i in range(num_atoms):
         for j in range(i + 1, num_atoms):
             dist = distances[i, j]
-            atom1, atom2 = atom_decoder[atom_type[i]], atom_decoder[atom_type[j]]
+            # atom1, atom2 = atom_decoder[atom_type[i]], atom_decoder[atom_type[j]]
+            atom1, atom2 = atom_type[i], atom_type[j]
             order = bond_analyze.get_bond_order(
                 atom1, atom2, dist, single_bond=single_bond
             )
@@ -196,7 +204,7 @@ def check_stability(
             nr_bonds[j] += order
     nr_stable_bonds = 0
     for atom_type_i, nr_bonds_i in zip(atom_type, nr_bonds):
-        possible_bonds = bond_analyze.allowed_bonds[atom_decoder[atom_type_i]]
+        possible_bonds = bond_analyze.allowed_bonds[atom_type_i]
         # hydrogen added, no more implicit bonds
         if with_h:
             if type(possible_bonds) == int:
@@ -211,7 +219,7 @@ def check_stability(
         if not is_stable and debug:
             print(
                 "Invalid bonds for molecule %s with %d bonds"
-                % (atom_decoder[atom_type_i], nr_bonds_i)
+                % (atom_type_i, nr_bonds_i)
             )
         nr_stable_bonds += int(is_stable)
 

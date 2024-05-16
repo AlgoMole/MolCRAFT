@@ -13,6 +13,73 @@ from core.evaluation.docking_vina import VinaDockingTask
 from typing import List, Dict, Tuple
 from tqdm import tqdm
 import numpy as np
+import os
+from posecheck import PoseCheck
+
+
+class ModelResults:
+    def __init__(self, name, full_name, results: list[dict]=None):
+        self.name = name
+        self.full_name = full_name
+        self.results = results
+    
+    def __len__(self):
+        return len(self.results)
+    
+    def __getitem__(self, idx):
+        return self.results[idx]
+
+    @property
+    def complete_list(self):
+        return np.array([x['complete'] for x in self.results])
+
+    @property
+    def validity_list(self):
+        return np.array([x['validity'] for x in self.results])
+
+    @property
+    def atom_num_list(self):
+        return np.array([x['mol'].GetNumAtoms() for x in self.results])
+
+    @property
+    def qed_list(self):
+        return np.array([(x['chem_results']['qed'] if 'chem_results' in x else np.nan) for x in self.results])
+    
+    @property
+    def sa_list(self):
+        return np.array([(x['chem_results']['sa'] if 'chem_results' in x else np.nan) for x in self.results])
+    
+    @property
+    def logp_list(self):
+        return np.array([(x['chem_results']['logp'] if 'chem_results' in x else np.nan) for x in self.results])
+    
+    @property
+    def lipinski_list(self):
+        return np.array([(x['chem_results']['lipinski'] if 'chem_results' in x else np.nan) for x in self.results])
+
+    @property
+    def vina_score_list(self):
+        return np.array([(x['vina']['score_only'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+    
+    @property
+    def vina_min_list(self):
+        return np.array([(x['vina']['minimize'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+    
+    @property
+    def vina_dock_list(self):
+        return np.array([(x['vina']['dock'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+
+    @property
+    def smiles_list(self):
+        return np.array([x['smiles'] for x in self.results])
+    
+    @property
+    def strain_list(self):
+        return np.array([(x['pose_check']['strain'] if 'pose_check' in x else np.nan) for x in self.results])
+
+    @property
+    def clash_list(self):
+        return np.array([(x['pose_check']['clash'] if 'pose_check' in x else np.nan) for x in self.results])
 
 
 class CondMolGenMetric(object):
@@ -25,20 +92,20 @@ class CondMolGenMetric(object):
         self.single_bond = single_bond
         self.docking_config = docking_config
 
-    def compute_stability(self, generated: List[Data]):
+    def compute_stability(self, generated: ModelResults):
         n_samples = len(generated)
         molecule_stable = 0
         nr_stable_bonds = 0
         n_atoms = 0
         for data in generated:
-            positions = data.pos
-            atom_type = data.x
+            positions = data['pred_pos']
+            atom_type = data['pred_v']
             
             stability_results = check_stability(
                 positions=positions,
                 atom_type=atom_type,
-                type_one_hot=self.type_one_hot,
-                atom_decoder=self.atom_decoder,
+                # type_one_hot=self.type_one_hot,
+                # atom_decoder=self.atom_decoder,
                 single_bond=self.single_bond,
             )
             
@@ -55,62 +122,27 @@ class CondMolGenMetric(object):
         }
         return stability_dict
 
-    def compute_recon_success(self, generated: List[Data]):
-        """generated: list of couples (positions, atom_types)"""
-        valid, complete = [], []
+    def compute_chem_results(self, generated: ModelResults):
+        # chem_list = []
+        pc = None
+        last_protein_fn = None
 
-        for graph in generated:
+        for item in tqdm(generated, total=len(generated), desc="Chem eval"):
+            mol = item['mol']
+
             try:
-                mol = graph.mol
-            except:
-                continue
-            smiles = mol2smiles(mol)
-            if smiles is not None:
-                data = {"mol": mol, "smiles": smiles, "ligand_filename": graph.ligand_filename}
-                if '.' in smiles:
-                    mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
-                    largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
-                    smiles = mol2smiles(largest_mol)
-                    if smiles is not None:
-                        valid.append(data)
-                else:
-                    valid.append(data)
-                    complete.append(data)
+                ligand_filename = item['ligand_filename']
+                # pos = item['pos'].cpu().numpy().astype('float64')
+                pos = item['pred_pos']
 
-        recon_dict = {
-            "validity": len(valid) / len(generated),  # valid
-            "completeness": len(complete) / len(generated),
-        }
-        return valid, recon_dict
-
-    def compute_chem_results(self, generated: List[Dict]):
-        chem_list = []
-        for graph in tqdm(generated, total=len(generated), desc="Chem eval"):
-            chem_results = {}
-            try:
-                mol = graph.mol
-            except:
-                chem_list.append(chem_results)
-                continue
-            try:
-                mol = graph.mol
-                mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
-                if len(mol_frags) > 1:
-                    largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
-                    if self.docking_config is not None and self.docking_config.mode == 'vina_dock':
-                        prefix = "Dock testing"
-                    else:
-                        prefix = "Validating"
-                    chem_list.append(chem_results)
-                    continue
-                    
-                ligand_filename = graph.ligand_filename
-                pos = graph.pos.cpu().numpy().astype('float64')
-
-                # qed, logp, sa, lipinski, ring size, etc
+                # qed, logp, sa, lipinski, etc
                 chem_results = scoring_func.get_chem(mol)
                 chem_results['atom_num'] = mol.GetNumAtoms()
-                
+                item['chem_results'] = chem_results
+            except Exception as e:
+                print(f'[CHEM FAIL] {e}')
+
+            try:
                 # docking
                 if self.docking_config is not None:
                     if self.docking_config.mode == 'qvina':
@@ -126,35 +158,52 @@ class CondMolGenMetric(object):
                         score_only_results = vina_task.run(mode='score_only', exhaustiveness=self.docking_config.exhaustiveness)
                         minimize_results = vina_task.run(mode='minimize', exhaustiveness=self.docking_config.exhaustiveness)
                         vina_results = {
-                            'vina_score': score_only_results[0]['affinity'],
-                            'vina_minimize': minimize_results[0]['affinity'],
+                            'score_only': score_only_results,
+                            'minimize': minimize_results,
                         }
                         if self.docking_config.mode == 'vina_dock':
                             docking_results = vina_task.run(mode='dock', exhaustiveness=self.docking_config.exhaustiveness)
-                            vina_results['vina_dock'] = docking_results[0]['affinity']
-                            vina_results['pose'] = docking_results[0]['pose']
+                            vina_results['dock'] = docking_results
                         # pose_check_results = vina_task.run_pose_check()
                     else:
                         raise NotImplementedError(f"Unknown docking mode: {self.docking_config.mode}")
-                    chem_results.update(vina_results)
+                    item['vina'] = vina_results
                     # chem_results.update(pose_check_results)
             except Exception as e:
-                print(e)
+                print(f'[VINA FAIL] {e}')
 
-            chem_list.append(chem_results)
+            try:
+                protein_fn = os.path.join(
+                    self.docking_config.protein_root,
+                    os.path.dirname(ligand_filename),
+                    os.path.basename(ligand_filename)[:10] + '.pdb'
+                )
+                if protein_fn != last_protein_fn:
+                    del pc
+                    pc = PoseCheck()
+                    pc.load_protein_from_pdb(protein_fn)
+                    last_protein_fn = protein_fn
+                pc.load_ligands_from_mols([mol])
+                strain = pc.calculate_strain_energy()[0]
+                clash = pc.calculate_clashes()[0]
+                item['pose_check'] = {
+                    'strain': strain,
+                    'clash': clash,
+                }
+            except Exception as e:
+                print(f'[POSE CHECK FAIL] {e}')
 
-        return chem_list
-
-    def compute_geometry(self, generated: List[Data]):
+    def compute_geometry(self, generated: ModelResults):
         geo_list = []
 
         for graph in generated:
-            positions = graph.pos
-            mol_center = positions.mean(dim=0)
-            protein_center = graph.protein_pos.mean(dim=0)
+            positions = graph['pred_pos']
+            mol_center = positions.mean(axis=0)
+            protein_center = graph['protein_pos'].mean(axis=0)
+            del graph['protein_pos']
             geo_list.append({
-                'center_change': (mol_center - protein_center).norm().item(),
-                'mol_pos_range':(positions.max(dim=0)[0] - positions.min(dim=0)[0]).norm().item()
+                'center_change': np.linalg.norm(mol_center - protein_center),
+                'mol_pos_range': np.linalg.norm(positions.max(axis=0)[0] - positions.min(axis=0)[0]),
             })
 
         geo_dict = {
@@ -163,51 +212,123 @@ class CondMolGenMetric(object):
         }
         return geo_dict
 
-    def evaluate(self, generated: List[Data], raw_evaluation=None):
-        if raw_evaluation is None:
-            raw_evaluation = self.compute_raw_evaluation(generated)
-
-        metrics = {}
-        for k, v in raw_evaluation.items():
-            if isinstance(v, float):
-                metrics[k] = v
-            elif isinstance(v, list):
-                if len(v) == 0: continue
-                # calc median while excluding None
-                chem_list = [v2 for v2 in v if v2 is not None]
-                chem_keys = list(set([k for d in chem_list for k in d.keys()]))
-                for k2 in chem_keys:
-                    if 'pose' in k2: continue
-                    k_list = [d[k2] for d in chem_list if k2 in d]
-                    if 'vina' not in k2:
-                        metrics[k2 + '_mean'] = np.mean(k_list)
-                    else:
-                        # calc mean while excluding positive values
-                        metrics[k2 + '_median'] = np.median(k_list)
-                        metrics[k2 + '_mean'] = np.mean(k_list)
-                        k_list_neg = [v2 for v2 in k_list if v2 < 0]
-                        metrics[k2 + '_mean_neg'] = np.mean(k_list_neg)
-                        metrics[k2 + '_neg_ratio'] = len(k_list_neg) / len(generated)
-            else:
-                raise ValueError(f"Unknown type of {k}: {type(v)}")
-        
-        return metrics
-
-    def compute_raw_evaluation(self, generated: List[Data]):
+    def evaluate(self, generated: ModelResults, bad_case_dir: str = None):
         """generated: list of pairs 
         (positions: n x 3, atom_types: n x K [int] if type_one_hot else n [int])
         the positions and atom types should already be masked."""
 
         # eval
         stability_dict = self.compute_stability(generated)
-        valid, recon_dict = self.compute_recon_success(generated)
+        # valid, recon_dict = self.compute_recon_success(generated)
         geo_dict = self.compute_geometry(generated)
 
-        chem_list = self.compute_chem_results(generated)  # TargetDiff reconstruction
+        self.compute_chem_results(generated)  # TargetDiff reconstruction
 
-        return {
-            **recon_dict,
+        metrics = {
+            # **recon_dict,
             **stability_dict,
             **geo_dict,
-            'chem': chem_list,
         }
+
+        def stat1(arr, name):
+            n_total = len(arr)
+            isnan = np.isnan(arr)
+            n_isnan = isnan.sum()
+            arr2 = arr[~isnan]
+            return {
+                f'{name}_fail': n_isnan / n_total,
+                f'{name}_mean': np.mean(arr2)
+            }
+
+        metrics.update(stat1(generated.qed_list, 'qed'))
+        metrics.update(stat1(generated.sa_list, 'sa'))
+
+        def save_bad_case(idx, res):
+            if bad_case_dir is None: return
+            mol = res['mol']
+            ligand_filename = res["ligand_filename"]
+            atom_num = res['chem_results']['atom_num']
+            qed = res['chem_results']['qed']
+            sa = res['chem_results']['sa']
+            lipinski = res['chem_results']['lipinski']
+            vina_score = res['vina']['score_only'][0]['affinity']
+            vina_min = res['vina']['minimize'][0]['affinity']
+            # vina_dock = res['vina']['dock'][0]['affinity']
+            strain = res['pose_check']['strain']
+            clash = res['pose_check']['clash']
+            mol.SetProp('_Name', ligand_filename)
+            mol.SetProp('atom_num', str(atom_num))
+            mol.SetProp('qed', str(qed))
+            mol.SetProp('sa', str(sa))
+            mol.SetProp('lipinski', str(lipinski))
+            mol.SetProp('vina_score', str(vina_score))
+            mol.SetProp('vina_min', str(vina_min))
+            mol.SetProp('strain', str(strain))
+            mol.SetProp('clash', str(clash))
+            with Chem.SDWriter(os.path.join(bad_case_dir, f'{idx}.sdf')) as w:
+                w.write(mol)
+
+        pos_vina_msg = {}
+        no_vina_msg = {}
+        for idx, res in enumerate(generated):
+            ligand_filename = res["ligand_filename"]
+            try:
+                vina_score = res['vina']['score_only'][0]['affinity']
+                if vina_score > 0:
+                    if ligand_filename not in pos_vina_msg:
+                        pos_vina_msg[ligand_filename] = []
+                    pos_vina_msg[ligand_filename].append((idx, vina_score))
+                    save_bad_case(idx, res)
+            except Exception as e:
+                if ligand_filename not in no_vina_msg:
+                    no_vina_msg[ligand_filename] = []
+                no_vina_msg[ligand_filename].append(idx)
+        if len(pos_vina_msg):
+            for k, v in pos_vina_msg.items():
+                print(f'[POS VINA] ligand_fn = {k}, n_ligand = {len(v)}')
+                print(f'[POS VINA] ligand index = {v}')
+        if len(no_vina_msg):
+            for k, v in no_vina_msg.items():
+                print(f'[NO VINA] ligand_fn = {k}, n_ligand = {len(v)}')
+                print(f'[NO VINA] ligand index = {v}')                
+
+        def stat2(arr, name):
+            n_total = len(arr)
+            isnan = np.isnan(arr)
+            n_isnan = isnan.sum()
+            arr2 = arr[~isnan]
+            return {
+                f'{name}_fail': n_isnan / n_total,
+                f'{name}_mean': np.mean(arr2),
+                f'{name}_median': np.median(arr2),
+                f'{name}_neg_mean': np.mean(arr2[arr2 < 0]),
+                f'{name}_neg_ratio': (arr2 < 0).sum() / len(arr2),
+            }
+
+        if 'vina' in generated[0]:
+            vina_score_list = generated.vina_score_list
+            metrics.update(stat2(vina_score_list, 'vina_score'))
+            if 'minimize' in generated[0]['vina']:
+                vina_min_list = generated.vina_min_list
+                metrics.update(stat2(vina_min_list, 'vina_minimize'))
+            if 'dock' in generated[0]['vina']:
+                vina_dock_list = generated.vina_dock_list
+                metrics.update(stat2(vina_dock_list, 'vina_dock'))
+
+        def stat3(arr, name):
+            n_total = len(arr)
+            isnan = np.isnan(arr)
+            n_isnan = isnan.sum()
+            arr2 = arr[~isnan]
+            perc = np.percentile(arr2, [25, 50, 75])
+            return {
+                f'{name}_fail': n_isnan / n_total,
+                f'{name}_25': perc[0],
+                f'{name}_50': perc[1],
+                f'{name}_75': perc[2],
+            }
+
+        metrics.update(stat1(generated.clash_list, 'clash'))
+        metrics.update(stat3(generated.strain_list, 'strain'))
+    
+        return metrics

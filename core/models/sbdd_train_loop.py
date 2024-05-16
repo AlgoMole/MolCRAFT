@@ -14,7 +14,6 @@ from core.models.bfn4sbdd import BFN4SBDDScoreModel
 
 import core.evaluation.utils.atom_num as atom_num
 import core.utils.transforms as trans
-import core.utils.reconstruct as reconstruct
 
 from core.utils.train import get_optimizer, get_scheduler
 
@@ -158,19 +157,26 @@ class SBDDTrainLoop(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        out_data_list = []
-        for _ in range(5):
-            out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref'))
+        out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref', desc=f'Val')
         return out_data_list
     
     def test_step(self, batch, batch_idx):
         # TODO change order, samples of the same pocket should be together, reduce protein loading
         out_data_list = []
-        for _ in range(self.cfg.evaluation.num_samples):
-            out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms))
-        return out_data_list
+        n_samples = self.cfg.evaluation.num_samples
+        for _ in range(n_samples):
+            batch_output = self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms, 
+                                                     desc=f'Test-{_}/{n_samples}')
+            # for idx, item in enumerate(batch_output):
+            out_data_list.append(batch_output)
+                
+        out_data_list_reorder = []
+        for i in range(len(out_data_list[0])):
+            for j in range(len(out_data_list)):
+                out_data_list_reorder.append(out_data_list[j][i])
+        return out_data_list_reorder
 
-    def shared_sampling_step(self, batch, batch_idx, sample_num_atoms):
+    def shared_sampling_step(self, batch, batch_idx, sample_num_atoms, desc=''):
         # here we need to sample the molecules in the validation step
         protein_pos, protein_v, batch_protein, ligand_pos, ligand_v, batch_ligand = (
             batch.protein_pos,
@@ -223,6 +229,7 @@ class SBDDTrainLoop(pl.LightningModule):
             sample_steps=self.cfg.evaluation.sample_steps,
             n_nodes=num_graphs,
             # ligand_pos=ligand_pos,  # for debug only
+            desc=desc,
         )
 
         # restore ligand to original position
@@ -255,38 +262,25 @@ class SBDDTrainLoop(pl.LightningModule):
 
         # print('[DEBUG]', num_graphs, len(ligand_cum_atoms))
         
-        results = []
-        for i in range(num_graphs):            
-            try:
-                mol = reconstruct.reconstruct_from_generated(
-                    pred_pos[batch_ligand == i].cpu().numpy().astype(np.float64),
-                    pred_atom_type[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
-                    pred_aromatic[ligand_cum_atoms[i]:ligand_cum_atoms[i + 1]],
-                )
-            except reconstruct.MolReconsError:
-                # print('[DEBUG]', i, 'failed')
-                mol = None
-            results.append(mol)
-        
         # add necessary dict to new pyg batch
         out_batch.x, out_batch.pos = atom_type, pred_pos
         out_batch.atom_type = torch.tensor(pred_atom_type, dtype=torch.long, device=ligand_pos.device)
         out_batch.is_aromatic = torch.tensor(pred_aromatic, dtype=torch.long, device=ligand_pos.device)
-        out_batch.mol = results
+        # out_batch.mol = results
 
         _slice_dict = {
             "x": ligand_cum_atoms,
             "pos": ligand_cum_atoms,
             "atom_type": ligand_cum_atoms,
             "is_aromatic": ligand_cum_atoms,
-            "mol": out_batch._slice_dict["ligand_filename"],
+            # "mol": out_batch._slice_dict["ligand_filename"],
         }
         _inc_dict = {
             "x": out_batch._inc_dict["ligand_element"], # [0] * B, TODO: figure out what this is
             "pos": out_batch._inc_dict["ligand_pos"],
             "atom_type": out_batch._inc_dict["ligand_element"],
             "is_aromatic": out_batch._inc_dict["ligand_element"],
-            "mol": out_batch._inc_dict["ligand_filename"],
+            # "mol": out_batch._inc_dict["ligand_filename"],
         }
         out_batch._inc_dict.update(_inc_dict)
         out_batch._slice_dict.update(_slice_dict)
