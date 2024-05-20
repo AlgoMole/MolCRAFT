@@ -130,6 +130,7 @@ def set_test_output_dir(cfg):
         path = cfg.accounting.test_outputs_dir + f'_v{version}'
     print(f'{cfg.accounting.test_outputs_dir} already exists, change test_output_dir to {path}')
     cfg.accounting.test_outputs_dir = path
+    os.makedirs(cfg.accounting.test_outputs_dir, exist_ok=True)
 
 
 def get_logger(cfg):
@@ -246,28 +247,30 @@ if __name__ == "__main__":
     wandb_logger = get_logger(cfg)
     
     if cfg.test_only:
-        tr_cfg = Config(cfg.accounting.dump_config_path)
-        tr_cfg.test_only = cfg.test_only
-        tr_cfg.evaluation = cfg.evaluation
-        tr_cfg.visual = cfg.visual
-        tr_cfg.accounting = cfg.accounting
-        # TODO: temporarily test different beta1 and sigma1_coord
-        tr_cfg.dynamics.beta1 = cfg.dynamics.beta1
-        tr_cfg.dynamics.sigma1_coord = cfg.dynamics.sigma1_coord
-        tr_cfg.dynamics.sampling_strategy = cfg.dynamics.sampling_strategy
-        if hasattr(cfg.dynamics, 'guide_mode'):
-            tr_cfg.dynamics.guide_mode = cfg.dynamics.guide_mode
-            tr_cfg.dynamics.objective = cfg.dynamics.objective
-            tr_cfg.dynamics.pos_grad_weight = cfg.dynamics.pos_grad_weight
-            tr_cfg.dynamics.type_grad_weight = cfg.dynamics.type_grad_weight
-            if cfg.dynamics.guide_mode is not None:
-                tr_cfg.evaluation.batch_size = 4
-        tr_cfg.data = cfg.data
-        tr_cfg.seed = cfg.seed
-        cfg = tr_cfg
+        if os.path.exists(cfg.accounting.dump_config_path):
+            # reload training config
+            tr_cfg = Config(cfg.accounting.dump_config_path)
+            tr_cfg.test_only = cfg.test_only
+            tr_cfg.evaluation = cfg.evaluation
+            tr_cfg.visual = cfg.visual
+            tr_cfg.accounting = cfg.accounting
+            # TODO: temporarily test different beta1 and sigma1_coord
+            tr_cfg.dynamics.beta1 = cfg.dynamics.beta1
+            tr_cfg.dynamics.sigma1_coord = cfg.dynamics.sigma1_coord
+            tr_cfg.dynamics.sampling_strategy = cfg.dynamics.sampling_strategy
+            if hasattr(cfg.dynamics, 'guide_mode'):
+                tr_cfg.dynamics.guide_mode = cfg.dynamics.guide_mode
+                tr_cfg.dynamics.objective = cfg.dynamics.objective
+                tr_cfg.dynamics.pos_grad_weight = cfg.dynamics.pos_grad_weight
+                tr_cfg.dynamics.type_grad_weight = cfg.dynamics.type_grad_weight
+                if cfg.dynamics.guide_mode is not None:
+                    tr_cfg.evaluation.batch_size = 4
+            tr_cfg.data = cfg.data
+            tr_cfg.seed = cfg.seed
+            cfg = tr_cfg
         if not hasattr(cfg.train, 'max_grad_norm'):
             cfg.train.max_grad_norm = 'Q'
-        # cfg.save2yaml(os.path.join(cfg.accounting.test_outputs_dir, 'config.yaml'))
+        cfg.save2yaml(os.path.join(cfg.accounting.test_outputs_dir, 'config.yaml'))
     else:
         cfg.save2yaml(cfg.accounting.dump_config_path)
 

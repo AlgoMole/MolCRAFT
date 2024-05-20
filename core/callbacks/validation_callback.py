@@ -255,6 +255,7 @@ class ValidationCallback(Callback):
         super().on_validation_epoch_end(trainer, pl_module)
 
         recon_loss = self.calc_recon_loss(trainer, pl_module)
+        pl_module.log_dict(recon_loss)
         print(json.dumps(recon_loss, indent=4))
 
         results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
