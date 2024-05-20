@@ -205,7 +205,7 @@ if __name__ == "__main__":
     parser.add_argument('--ckpt_path', type=str, default='best', help='path to the checkpoint')
     parser.add_argument("--num_samples", type=int, default=5)
     parser.add_argument("--sample_steps", type=int, default=100)
-    parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
+    parser.add_argument('--sample_num_atoms', type=str, default='ref', choices=['prior', 'ref'])
     parser.add_argument("--visual_chain", action="store_true")
     parser.add_argument("--docking_mode", type=str, default="vina_score", choices=['vina_score', 'vina_dock'])
 
