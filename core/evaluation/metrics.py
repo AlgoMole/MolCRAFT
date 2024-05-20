@@ -15,6 +15,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 from posecheck import PoseCheck
+from copy import deepcopy
 
 
 class ModelResults:
@@ -30,12 +31,24 @@ class ModelResults:
         return self.results[idx]
 
     @property
+    def smiles_list(self):
+        return np.array([x['smiles'] for x in self.results])
+    
+    @property
     def complete_list(self):
         return np.array([x['complete'] for x in self.results])
 
     @property
     def validity_list(self):
         return np.array([x['validity'] for x in self.results])
+
+    @property
+    def center_change_list(self):
+        return np.array([x['center_change'] for x in self.results])
+    
+    @property
+    def mol_pos_range_list(self):
+        return np.array([x['mol_pos_range'] for x in self.results])
 
     @property
     def atom_num_list(self):
@@ -70,10 +83,6 @@ class ModelResults:
         return np.array([(x['vina']['dock'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
 
     @property
-    def smiles_list(self):
-        return np.array([x['smiles'] for x in self.results])
-    
-    @property
     def strain_list(self):
         return np.array([(x['pose_check']['strain'] if 'pose_check' in x else np.nan) for x in self.results])
 
@@ -92,7 +101,7 @@ class CondMolGenMetric(object):
         self.single_bond = single_bond
         self.docking_config = docking_config
 
-    def compute_stability(self, generated: ModelResults):
+    def compute_stability(self, generated: list[dict]):
         n_samples = len(generated)
         molecule_stable = 0
         nr_stable_bonds = 0
@@ -122,7 +131,7 @@ class CondMolGenMetric(object):
         }
         return stability_dict
 
-    def compute_chem_results(self, generated: ModelResults):
+    def compute_chem_results(self, generated: list[dict]):
         # chem_list = []
         pc = None
         last_protein_fn = None
@@ -193,41 +202,23 @@ class CondMolGenMetric(object):
             except Exception as e:
                 print(f'[POSE CHECK FAIL] {e}')
 
-    def compute_geometry(self, generated: ModelResults):
-        geo_list = []
-
-        for graph in generated:
-            positions = graph['pred_pos']
-            mol_center = positions.mean(axis=0)
-            protein_center = graph['protein_pos'].mean(axis=0)
-            del graph['protein_pos']
-            geo_list.append({
-                'center_change': np.linalg.norm(mol_center - protein_center),
-                'mol_pos_range': np.linalg.norm(positions.max(axis=0)[0] - positions.min(axis=0)[0]),
-            })
-
-        geo_dict = {
-            k: np.mean([d[k] for d in geo_list])
-            for k in geo_list[0].keys()
-        }
-        return geo_dict
-
-    def evaluate(self, generated: ModelResults, bad_case_dir: str = None):
+    def evaluate(self, generated: list[dict], bad_case_dir: str = None):
         """generated: list of pairs 
         (positions: n x 3, atom_types: n x K [int] if type_one_hot else n [int])
         the positions and atom types should already be masked."""
 
+        # generated = 
         # eval
         stability_dict = self.compute_stability(generated)
         # valid, recon_dict = self.compute_recon_success(generated)
-        geo_dict = self.compute_geometry(generated)
+        # geo_dict = self.compute_geometry(generated)
 
         self.compute_chem_results(generated)  # TargetDiff reconstruction
 
         metrics = {
             # **recon_dict,
             **stability_dict,
-            **geo_dict,
+            # **geo_dict,
         }
 
         def stat1(arr, name):
@@ -239,25 +230,38 @@ class CondMolGenMetric(object):
                 f'{name}_fail': n_isnan / n_total,
                 f'{name}_mean': np.mean(arr2)
             }
+        results = ModelResults('bfn', 'molcraft', generated)
 
-        metrics.update(stat1(generated.qed_list, 'qed'))
-        metrics.update(stat1(generated.sa_list, 'sa'))
+        metrics.update(stat1(results.qed_list, 'qed'))
+        metrics.update(stat1(results.sa_list, 'sa'))
 
         def save_bad_case(idx, res):
             if bad_case_dir is None: return
             mol = res['mol']
             ligand_filename = res["ligand_filename"]
             atom_num = res['chem_results']['atom_num']
+            center_change = res['center_change']
+            mol_pos_range = res['mol_pos_range']
             qed = res['chem_results']['qed']
             sa = res['chem_results']['sa']
             lipinski = res['chem_results']['lipinski']
-            vina_score = res['vina']['score_only'][0]['affinity']
-            vina_min = res['vina']['minimize'][0]['affinity']
+            if 'vina' in res:
+                vina_score = res['vina']['score_only'][0]['affinity']
+                vina_min = res['vina']['minimize'][0]['affinity']
+            else:
+                vina_score = np.nan
+                vina_min = np.nan
             # vina_dock = res['vina']['dock'][0]['affinity']
-            strain = res['pose_check']['strain']
-            clash = res['pose_check']['clash']
+            if 'pose_check' in res:
+                strain = res['pose_check']['strain']
+                clash = res['pose_check']['clash']
+            else:
+                strain = np.nan
+                clash = np.nan
             mol.SetProp('_Name', ligand_filename)
             mol.SetProp('atom_num', str(atom_num))
+            mol.SetProp('center_change', str(center_change))
+            mol.SetProp('mol_pos_range', str(mol_pos_range))
             mol.SetProp('qed', str(qed))
             mol.SetProp('sa', str(sa))
             mol.SetProp('lipinski', str(lipinski))
@@ -270,14 +274,23 @@ class CondMolGenMetric(object):
 
         pos_vina_msg = {}
         no_vina_msg = {}
-        for idx, res in enumerate(generated):
+        for idx, res in enumerate(results):
             ligand_filename = res["ligand_filename"]
             try:
                 vina_score = res['vina']['score_only'][0]['affinity']
-                if vina_score > 0:
+                vina_min = res['vina']['minimize'][0]['affinity']
+                if vina_score > 0 or vina_min > 0:
                     if ligand_filename not in pos_vina_msg:
-                        pos_vina_msg[ligand_filename] = []
-                    pos_vina_msg[ligand_filename].append((idx, vina_score))
+                        pos_vina_msg[ligand_filename] = ''
+                    
+                    _ = deepcopy(res)
+                    del _['pred_pos'], _['pred_v'], _['is_aromatic'], _['mol']
+                    _['vina'] = {
+                        'vina_score': vina_score,
+                        'vina_minimize': vina_min,
+                    }
+                    
+                    pos_vina_msg[ligand_filename] += f'{idx} {_}\n'
                     save_bad_case(idx, res)
             except Exception as e:
                 if ligand_filename not in no_vina_msg:
@@ -305,14 +318,14 @@ class CondMolGenMetric(object):
                 f'{name}_neg_ratio': (arr2 < 0).sum() / len(arr2),
             }
 
-        if 'vina' in generated[0]:
-            vina_score_list = generated.vina_score_list
+        if 'vina' in results[0]:
+            vina_score_list = results.vina_score_list
             metrics.update(stat2(vina_score_list, 'vina_score'))
-            if 'minimize' in generated[0]['vina']:
-                vina_min_list = generated.vina_min_list
+            if 'minimize' in results[0]['vina']:
+                vina_min_list = results.vina_min_list
                 metrics.update(stat2(vina_min_list, 'vina_minimize'))
-            if 'dock' in generated[0]['vina']:
-                vina_dock_list = generated.vina_dock_list
+            if 'dock' in results[0]['vina']:
+                vina_dock_list = results.vina_dock_list
                 metrics.update(stat2(vina_dock_list, 'vina_dock'))
 
         def stat3(arr, name):
@@ -328,7 +341,7 @@ class CondMolGenMetric(object):
                 f'{name}_75': perc[2],
             }
 
-        metrics.update(stat1(generated.clash_list, 'clash'))
-        metrics.update(stat3(generated.strain_list, 'strain'))
+        metrics.update(stat1(results.clash_list, 'clash'))
+        metrics.update(stat3(results.strain_list, 'strain'))
     
         return metrics
