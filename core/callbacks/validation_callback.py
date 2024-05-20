@@ -50,6 +50,7 @@ def reconstruct_mol_and_filter_invalid(out_list):
     results = []
     n_recon, n_complete, n_valid = 0, 0, 0
     n_total = len(out_list)
+    center_change_list, mol_pos_range_list = [], []
 
     for item in out_list:
         ligand_filename, pos, atom_type, is_aromatic = item.ligand_filename, item.pos, item.atom_type, item.is_aromatic
@@ -59,17 +60,24 @@ def reconstruct_mol_and_filter_invalid(out_list):
         atom_type = atom_type.cpu().numpy().astype('int32')
         is_aromatic = is_aromatic.cpu().numpy().astype('bool')
         protein_pos = protein_pos.cpu().numpy().astype('float64')
-
-        res = {
-            'ligand_filename': ligand_filename, 
-            'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
-            'protein_pos': protein_pos,
-        }
         # TODO turn off basic_mode = False to use predicted aromaticity
         try:
             mol = reconstruct_from_generated(pos, atom_type, is_aromatic, basic_mode=True)
             n_recon += 1
-            res['mol'] = mol
+
+            mol_center = pos.mean(axis=0)
+            protein_center = protein_pos.mean(axis=0)
+            center_change = np.linalg.norm(mol_center - protein_center)
+            mol_pos_range = np.linalg.norm(pos.max(axis=0)[0] - pos.min(axis=0)[0])
+
+            res = {
+                'mol': mol, 'ligand_filename': ligand_filename, 
+                'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
+                'protein_center': protein_center, 'mol_center': mol_center,
+                'center_change': center_change, 'mol_pos_range': mol_pos_range,
+            }
+            center_change_list.append(center_change)
+            mol_pos_range_list.append(mol_pos_range)
 
             Chem.SanitizeMol(mol)
             smiles = Chem.MolToSmiles(mol)
@@ -85,17 +93,18 @@ def reconstruct_mol_and_filter_invalid(out_list):
         except Exception as e:
             continue
 
-    results = ModelResults('bfn', 'molcraft', results)
     return results, {
         'recon_success': n_recon / n_total,
         'completeness': n_complete / n_total,
         'validity': n_valid / n_total,
+        'center_change': np.mean(center_change_list),
+        'mol_pos_range': np.mean(mol_pos_range_list),
     }
 
 
 # TODO merge with ReconValidationCallback
 class ValidationCallback(Callback):
-    def __init__(self, dataset, atom_enc_mode, atom_decoder, atom_type_one_hot, single_bond, docking_config) -> None:
+    def __init__(self, dataset, atom_enc_mode, atom_decoder, atom_type_one_hot, single_bond, docking_config, val_freq) -> None:
         super().__init__()
         self.dataset = dataset
         self.atom_enc_mode = atom_enc_mode
@@ -104,6 +113,7 @@ class ValidationCallback(Callback):
         self.type_one_hot = atom_type_one_hot
         self.docking_config = copy.deepcopy(docking_config)
         self.docking_config.mode = 'vina_score'
+        self.val_freq = val_freq
         self.outputs = []
 
     def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
@@ -115,6 +125,111 @@ class ValidationCallback(Callback):
             single_bond=self.single_bond,
             docking_config=self.docking_config,
         )
+
+    def on_train_batch_start(
+            self,
+            trainer: Trainer,
+            pl_module: LightningModule,
+            batch: Any,
+            batch_idx: int,
+            unused: int = 0,
+        ) -> None:
+        super().on_train_batch_start(trainer, pl_module, batch, batch_idx)
+
+    @torch.no_grad()
+    def calc_recon_loss(self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+    ) -> None:
+        
+        with torch.no_grad():
+            pl_module.dynamics.eval()
+            sum_batches, sum_loss, sum_loss_pos, sum_loss_type = 0, 0., 0., 0.
+            pos_normalizer = torch.tensor(
+                pl_module.cfg.data.normalizer_dict.pos, dtype=torch.float32, device=pl_module.device,
+            )
+
+            for batch in trainer.val_dataloaders:
+                # prepare batch data
+                batch = batch.to(pl_module.device)
+
+                batch.protein_pos = batch.protein_pos / pos_normalizer
+                batch.ligand_pos = batch.ligand_pos / pos_normalizer
+
+                protein_pos, protein_v, batch_protein, ligand_pos, ligand_v, batch_ligand = (
+                    batch.protein_pos, 
+                    batch.protein_atom_feature.float(), 
+                    batch.protein_element_batch, 
+                    batch.ligand_pos,
+                    batch.ligand_atom_feature_full, 
+                    batch.ligand_element_batch
+                )
+                # move protein center to origin & ligand correspondingly
+                protein_pos, ligand_pos, offset = center_pos(
+                    protein_pos, ligand_pos, batch_protein, batch_ligand, mode=pl_module.cfg.dynamics.center_pos_mode) #TODO: ugly 
+                num_graphs = batch_protein.max().item() + 1
+                sum_batches += num_graphs * (pl_module.cfg.dynamics.discrete_steps // 10)
+                
+                # sample a random timestep for reconstruction loss computation
+                for t in range(0, pl_module.cfg.dynamics.discrete_steps, 10):
+                    t = torch.tensor(
+                        [t / float(pl_module.cfg.dynamics.discrete_steps)], 
+                        dtype=ligand_pos.dtype, device=ligand_pos.device
+                    ).repeat(num_graphs, 1).index_select(
+                        0, batch_ligand
+                    )  # [num_graphs, 1]
+
+                    if not pl_module.cfg.dynamics.use_discrete_t and not pl_module.cfg.dynamics.destination_prediction:
+                        t = torch.clamp(t, min=pl_module.dynamics.t_min)  # clamp t to [t_min,1]
+
+                    # compute bfn loss  # TODO: convert to reconstruction loss
+                    c_loss, d_loss, discretised_loss = pl_module.dynamics.reconstruction_loss_one_step(
+                        t,
+                        protein_pos=protein_pos,
+                        protein_v=protein_v,
+                        batch_protein=batch_protein,
+                        ligand_pos=ligand_pos,
+                        ligand_v=ligand_v,
+                        batch_ligand=batch_ligand,
+                    )
+                    loss = torch.mean(c_loss + pl_module.cfg.train.v_loss_weight * d_loss + discretised_loss)
+                    sum_loss += float(loss) * num_graphs
+                    sum_loss_pos += float(c_loss.sum())
+                    sum_loss_type += float(d_loss.sum())
+
+            recon_loss = {
+                "val/recon_loss": sum_loss / sum_batches,
+                "val/recon_loss_pos": sum_loss_pos / sum_batches,
+                "val/recon_loss_type": sum_loss_type / sum_batches,
+            }
+            return recon_loss
+
+    @torch.no_grad()
+    def on_train_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+        outputs: STEP_OUTPUT,
+        batch: Any,
+        batch_idx: int,
+        unused: int = 0,
+    ) -> None:
+        super().on_train_batch_end(
+            trainer, pl_module, outputs, batch, batch_idx
+        )
+        
+        if trainer.global_step % self.val_freq == 0: 
+            # perform a full validation
+            recon_loss = self.calc_recon_loss(trainer, pl_module)
+            pl_module.dynamics.train()
+
+            pl_module.log_dict(
+                recon_loss, 
+                on_step=True,
+                prog_bar=False, 
+                batch_size=pl_module.cfg.train.batch_size,
+            )
+            print(json.dumps(recon_loss, indent=4))
 
     def on_validation_batch_end(
         self,
@@ -139,6 +254,9 @@ class ValidationCallback(Callback):
     ) -> None:
         super().on_validation_epoch_end(trainer, pl_module)
 
+        recon_loss = self.calc_recon_loss(trainer, pl_module)
+        print(json.dumps(recon_loss, indent=4))
+
         results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
 
         if len(results) == 0:
@@ -154,10 +272,12 @@ class ValidationCallback(Callback):
         torch.save(results, os.path.join(path, f'generated.pt'))
         
         out_metrics = self.metric.evaluate(results)
+        torch.save(results, os.path.join(path, f'vina_docked.pt'))
         out_metrics.update(recon_dict)
         out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
         pl_module.log_dict(out_metrics)
         print(json.dumps(out_metrics, indent=4))
+        json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
 
 
 class VisualizeMolAndTrajCallback(Callback):
@@ -353,109 +473,6 @@ class VisualizeMolAndTrajCallback(Callback):
         self.on_validation_epoch_end(trainer, pl_module)
 
 
-class ReconLossMonitor(Callback):
-    # compute the BFN reconstruction loss for validation dataloader.
-    def __init__(self, val_freq) -> None:
-        super().__init__()
-        self.val_freq = val_freq
-
-    @torch.no_grad()
-    def on_train_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: LightningModule,
-        outputs: STEP_OUTPUT,
-        batch: Any,
-        batch_idx: int,
-        unused: int = 0,
-    ) -> None:
-        super().on_train_batch_end(
-            trainer, pl_module, outputs, batch, batch_idx
-        )
-        
-        if trainer.global_step % self.val_freq == 0: 
-            # perform a full validation
-            with torch.no_grad():
-                # switch to eval mode
-                pl_module.dynamics.eval()
-                sum_batches, sum_loss, sum_loss_pos, sum_loss_type = 0, 0., 0., 0.
-                pos_normalizer = torch.tensor(
-                    pl_module.cfg.data.normalizer_dict.pos, dtype=torch.float32, device=batch.protein_pos.device
-                )
-
-                for batch in trainer.val_dataloaders:
-                    # prepare batch data
-                    batch = batch.to(pl_module.device)
-
-                    batch.protein_pos = batch.protein_pos / pos_normalizer
-                    batch.ligand_pos = batch.ligand_pos / pos_normalizer
-
-                    protein_pos, protein_v, batch_protein, ligand_pos, ligand_v, batch_ligand = (
-                        batch.protein_pos, 
-                        batch.protein_atom_feature.float(), 
-                        batch.protein_element_batch, 
-                        batch.ligand_pos,
-                        batch.ligand_atom_feature_full, 
-                        batch.ligand_element_batch
-                    )
-                    # move protein center to origin & ligand correspondingly
-                    protein_pos, ligand_pos, offset = center_pos(
-                        protein_pos, ligand_pos, batch_protein, batch_ligand, mode=pl_module.cfg.dynamics.center_pos_mode) #TODO: ugly 
-                    num_graphs = batch_protein.max().item() + 1
-                    sum_batches += num_graphs * (pl_module.cfg.dynamics.discrete_steps // 10)
-                    
-                    # sample a random timestep for reconstruction loss computation
-                    for t in range(0, pl_module.cfg.dynamics.discrete_steps, 10):
-                        t = torch.tensor(
-                            [t / float(pl_module.cfg.dynamics.discrete_steps)], 
-                            dtype=ligand_pos.dtype, device=ligand_pos.device
-                        ).repeat(num_graphs, 1).index_select(
-                            0, batch_ligand
-                        )  # [num_graphs, 1]
-
-                        if not pl_module.cfg.dynamics.use_discrete_t and not pl_module.cfg.dynamics.destination_prediction:
-                            t = torch.clamp(t, min=pl_module.dynamics.t_min)  # clamp t to [t_min,1]
-
-                        # compute bfn loss  # TODO: convert to reconstruction loss
-                        c_loss, d_loss, discretised_loss = pl_module.dynamics.reconstruction_loss_one_step(
-                            t,
-                            protein_pos=protein_pos,
-                            protein_v=protein_v,
-                            batch_protein=batch_protein,
-                            ligand_pos=ligand_pos,
-                            ligand_v=ligand_v,
-                            batch_ligand=batch_ligand,
-                        )
-                        loss = torch.mean(c_loss + pl_module.cfg.train.v_loss_weight * d_loss + discretised_loss)
-                        sum_loss += float(loss) * num_graphs
-                        sum_loss_pos += float(c_loss.sum())
-                        sum_loss_type += float(d_loss.sum())
-
-                recon_loss = {
-                    "val/recon_loss": sum_loss / sum_batches,
-                    "val/recon_loss_pos": sum_loss_pos / sum_batches,
-                    "val/recon_loss_type": sum_loss_type / sum_batches,
-                }
-                # log the mean reconstruction loss
-                pl_module.log_dict(
-                    recon_loss, 
-                    on_step=True,
-                    prog_bar=False, 
-                    batch_size=pl_module.cfg.train.batch_size,
-                )
-                print(json.dumps(recon_loss, indent=4))
-                # print(f"step {trainer.global_step}: recon_loss: {sum_loss / sum_batches:.4f}, recon_loss_pos: {sum_loss_pos / sum_batches:.4f}, recon_loss_type: {sum_loss_type / sum_batches:.4f}")
-                pl_module.dynamics.train()
-
-    def on_train_batch_start(
-            self,
-            trainer: Trainer,
-            pl_module: LightningModule,
-            batch: Any,
-            batch_idx: int,
-            unused: int = 0,
-        ) -> None:
-        super().on_train_batch_start(trainer, pl_module, batch, batch_idx)
 
 
 class DockingTestCallback(Callback):
@@ -509,19 +526,25 @@ class DockingTestCallback(Callback):
             return
 
         path = pl_module.cfg.accounting.test_outputs_dir
-        version = 0
-        while os.path.exists(path):
-            version += 1
-            path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
-        print(f'{pl_module.cfg.accounting.test_outputs_dir} already exists, saving to {path}')
+        # initiate log_dir together with test_otuput_dir
+        # version = 0
+        # while os.path.exists(path):
+        #     version += 1
+        #     path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        print(f'saving results to {path}')
         os.makedirs(path, exist_ok=True)
         torch.save(results, os.path.join(path, f'generated.pt'))
 
         bad_case_dir = os.path.join(path, 'bad_cases')
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(bad_case_dir, exist_ok=True)
+        print(f'bad cases dumped to {bad_case_dir}')
 
         out_metrics = self.metric.evaluate(results, bad_case_dir)
+        torch.save(results, os.path.join(path, f'vina_docked.pt'))
         out_metrics.update(recon_dict)
         out_metrics = {f'test/{k}': v for k, v in out_metrics.items()}
         pl_module.log_dict(out_metrics)
         print(json.dumps(out_metrics, indent=4))
+        json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)

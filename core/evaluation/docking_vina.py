@@ -9,7 +9,7 @@ import tempfile
 import AutoDockTools
 import os
 import contextlib
-from posecheck import PoseCheck
+import numpy as np
 
 from core.evaluation.docking_qvina import get_random_id, BaseDockingTask
 
@@ -68,13 +68,15 @@ class PrepProt(object):
         
     def addH(self, prot_pqr):  # call pdb2pqr
         self.prot_pqr = prot_pqr
-        subprocess.Popen(['pdb2pqr30','--ff=AMBER',self.prot, self.prot_pqr],
-                         stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
+        if not os.path.exists(prot_pqr):
+            subprocess.Popen(['pdb2pqr30','--ff=AMBER',self.prot, self.prot_pqr],
+                            stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
 
     def get_pdbqt(self, prot_pdbqt):
-        prepare_receptor = os.path.join(AutoDockTools.__path__[0], 'Utilities24/prepare_receptor4.py')
-        subprocess.Popen(['python3', prepare_receptor, '-xr', self.prot_pqr, '-o', prot_pdbqt],
-                         stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
+        if not os.path.exists(prot_pdbqt):
+            prepare_receptor = os.path.join(AutoDockTools.__path__[0], 'Utilities24/prepare_receptor4.py')
+            subprocess.Popen(['python3', prepare_receptor, '-r', self.prot_pqr, '-o', prot_pdbqt],
+                            stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).communicate()
 
 
 class VinaDock(object): 
@@ -110,8 +112,59 @@ class VinaDock(object):
         self.pocket_center, self.box_size = self._max_min_pdb(ref, buffer)
         print(self.pocket_center, self.box_size)
 
+    @property
+    def pdbqt_code_map(self):
+        return {
+            0: '',
+            1: 'Ru',
+            2: 'B',
+            3: 'V',
+            4: 'Sc',
+            5: 'Mo',
+            6: 'Cr',
+        }
+
+    def check_pdbqt_str(self, fn):
+        lig_str = open(fn, 'r').readlines()
+        # print(fn)
+        for s in lig_str:
+            if s.strip().endswith(' Ru'):
+                return 1
+            if s.strip().endswith(' B'):
+                return 2
+            if s.strip().endswith(' V'):
+                return 3
+            if s.strip().endswith(' Sc'):
+                return 4
+            if s.strip().endswith(' Mo'):
+                return 5
+            if s.strip().endswith(' Cr'):
+                return 6
+        return 0
+
+    # def tmp_dock(self, score_func='vina', seed=0, mode='dock', exhaustiveness=8, save_pose=False, **kwargs):  # seed=0 mean random seed
+    #     v = Vina(sf_name=score_func, seed=seed, verbosity=0, **kwargs)
+    #     prot_code = self.check_pdbqt_str(self.prot_pdbqt)
+    #     if prot_code > 0: return prot_code
+
+    #     lig_code = self.check_pdbqt_str(self.lig_pdbqt)
+    #     if lig_code > 0: return lig_code
+
+    #     v.set_receptor(self.prot_pdbqt)
+    #     v.set_ligand_from_file(self.lig_pdbqt)
+    #     return 0
+
     def dock(self, score_func='vina', seed=0, mode='dock', exhaustiveness=8, save_pose=False, **kwargs):  # seed=0 mean random seed
         v = Vina(sf_name=score_func, seed=seed, verbosity=0, **kwargs)
+        
+        prot_code = self.check_pdbqt_str(self.prot_pdbqt)
+        if prot_code > 0:
+            raise ValueError(f'atom type {self.pdbqt_code_map[prot_code]} cannot be parsed')
+        else:
+            lig_code = self.check_pdbqt_str(self.lig_pdbqt)
+            if lig_code > 0:
+                raise ValueError(f'atom type {self.pdbqt_code_map[lig_code]} cannot be parsed')
+        
         v.set_receptor(self.prot_pdbqt)
         v.set_ligand_from_file(self.lig_pdbqt)
         v.compute_vina_maps(center=self.pocket_center, box_size=self.box_size)
@@ -160,13 +213,18 @@ class VinaDockingTask(BaseDockingTask):
         return cls(protein_path, ligand_rdmol, **kwargs)
 
     @classmethod
+    def from_cross_docked(cls, protein_root, protein_fn, ligand_fn, **kwargs):
+        protein_path = os.path.join(protein_root, protein_fn)
+        ligand_path = os.path.join(protein_root, ligand_fn)
+        ligand_rdmol = next(iter(Chem.SDMolSupplier(ligand_path)))
+        return cls(protein_path, ligand_rdmol, **kwargs)
+
+    @classmethod
     def from_generated_mol(cls, ligand_rdmol, ligand_filename, protein_root='./data/crossdocked', **kwargs):
         # load original pdb
-        # TODO: make it more general and compatible with sample_for_pocket
         protein_fn = os.path.join(
             os.path.dirname(ligand_filename),
-            os.path.basename(ligand_filename)[:10] + '.pdb' if 'molecule' not in ligand_filename  # PDBId_Chain_rec.pdb
-                else os.path.basename(ligand_filename).replace('_molecule', '_protein').replace('.sdf', '.pdb')
+            os.path.basename(ligand_filename)[:10] + '.pdb'  # PDBId_Chain_rec.pdb
         )
         protein_path = os.path.join(protein_root, protein_fn)
         return cls(protein_path, ligand_rdmol, **kwargs)
@@ -193,9 +251,9 @@ class VinaDockingTask(BaseDockingTask):
         sdf_writer.close()
         self.ligand_rdmol = ligand_rdmol
 
-        pos = ligand_rdmol.GetConformer(0).GetPositions()
-        # if pos is None:
-        #    raise ValueError('pos is None')
+        if pos is None:
+            # raise ValueError('pos is None')
+            pos = ligand_rdmol.GetConformer(0).GetPositions()
         if center is None:
             self.center = (pos.max(0) + pos.min(0)) / 2
         else:
@@ -221,25 +279,38 @@ class VinaDockingTask(BaseDockingTask):
         lig.get_pdbqt(ligand_pdbqt)
 
         prot = PrepProt(self.receptor_path)
-        if not os.path.exists(protein_pqr):
-            prot.addH(protein_pqr)
-        if not os.path.exists(protein_pdbqt):
-            prot.get_pdbqt(protein_pdbqt)
+        # if not os.path.exists(protein_pqr):
+        prot.addH(protein_pqr)
+        # if not os.path.exists(protein_pdbqt):
+        prot.get_pdbqt(protein_pdbqt)
+        # print(os.path.exists(ligand_pdbqt), os.path.exists(protein_pqr), os.path.exists(protein_pdbqt))
 
         dock = VinaDock(ligand_pdbqt, protein_pdbqt)
         dock.pocket_center, dock.box_size = self.center, [self.size_x, self.size_y, self.size_z]
-        score, pose = dock.dock(score_func='vina', mode=mode, exhaustiveness=exhaustiveness, save_pose=True, **kwargs)
-        return [{'affinity': score, 'pose': pose}]
-    
-    @suppress_stdout
-    def run_pose_check(self):
-        pc = PoseCheck()
-        pc.load_protein_from_pdb(self.receptor_path)
-        # pc.load_ligands_from_sdf(self.ligand_path)
-        pc.load_ligands_from_mols([self.ligand_rdmol])
-        clashes = pc.calculate_clashes()
-        strain = pc.calculate_strain_energy()
-        return {'clashes': clashes[0], 'strain': strain[0]}
+        try:
+            score, pose = dock.dock(score_func='vina', mode=mode, exhaustiveness=exhaustiveness, save_pose=True, **kwargs)
+            return [{'affinity': score, 'pose': pose}]
+        except Exception as e:
+            return [{'affinity': np.nan, 'pose': 'None'}]
+
+    # def tmp_run(self, mode='dock', exhaustiveness=8, **kwargs):
+    #     ligand_pdbqt = self.ligand_path[:-4] + '.pdbqt'
+    #     protein_pqr = self.receptor_path[:-4] + '.pqr'
+    #     protein_pdbqt = self.receptor_path[:-4] + '.pdbqt'
+
+    #     lig = PrepLig(self.ligand_path, 'sdf')
+    #     lig.get_pdbqt(ligand_pdbqt)
+    #     prot = PrepProt(self.receptor_path)
+    #     # if not os.path.exists(protein_pqr):
+    #     prot.addH(protein_pqr)
+    #     # if not os.path.exists(protein_pdbqt):
+    #     prot.get_pdbqt(protein_pdbqt)
+    #     # print(os.path.exists(ligand_pdbqt), os.path.exists(protein_pqr), os.path.exists(protein_pdbqt))
+
+    #     dock = VinaDock(ligand_pdbqt, protein_pdbqt)
+    #     dock.pocket_center, dock.box_size = self.center, [self.size_x, self.size_y, self.size_z]
+    #     return_code = dock.tmp_dock(score_func='vina', mode=mode, exhaustiveness=exhaustiveness, save_pose=True, **kwargs)
+    #     return return_code
 
 
 # if __name__ == '__main__':

@@ -16,7 +16,6 @@ from core.callbacks.basic import RecoverCallback, GradientClip, NormalizerCallba
 from core.callbacks.validation_callback import (
     ValidationCallback,
     VisualizeMolAndTrajCallback,
-    ReconLossMonitor,
     DockingTestCallback,
 )
 
@@ -123,6 +122,16 @@ def get_dataloader(cfg):
     return train_loader, val_loader, test_loader
 
 
+def set_test_output_dir(cfg):
+    path = cfg.accounting.test_outputs_dir
+    version = 0
+    while os.path.exists(path):
+        version += 1
+        path = cfg.accounting.test_outputs_dir + f'_v{version}'
+    print(f'{cfg.accounting.test_outputs_dir} already exists, change test_output_dir to {path}')
+    cfg.accounting.test_outputs_dir = path
+
+
 def get_logger(cfg):
     os.makedirs(cfg.accounting.wandb_logdir, exist_ok=True)
     # TODO save code
@@ -217,7 +226,8 @@ if __name__ == "__main__":
     cfg = Config(**_args.__dict__)
     if not os.path.exists(cfg.accounting.logdir):
         os.makedirs(cfg.accounting.logdir, exist_ok=True)
-        shutil.copyfile('./configs/default.yaml', cfg.accounting.dump_config_path)
+        # shutil.copyfile('./configs/default.yaml', cfg.accounting.dump_config_path)
+    set_test_output_dir(cfg)
 
     seed_everything(cfg.seed, workers=True)
 
@@ -257,6 +267,7 @@ if __name__ == "__main__":
         cfg = tr_cfg
         if not hasattr(cfg.train, 'max_grad_norm'):
             cfg.train.max_grad_norm = 'Q'
+        # cfg.save2yaml(os.path.join(cfg.accounting.test_outputs_dir, 'config.yaml'))
     else:
         cfg.save2yaml(cfg.accounting.dump_config_path)
 
@@ -290,6 +301,7 @@ if __name__ == "__main__":
                 atom_type_one_hot=False,
                 single_bond=True,
                 docking_config=cfg.evaluation.docking_config,
+                val_freq=cfg.train.val_freq,
                 # single_bond=cfg.evaluation.single_bond,  # TODO: check compatibility
             ),
             # VisualizeMolAndTrajCallback(
@@ -297,9 +309,6 @@ if __name__ == "__main__":
             #     colors_dic=cfg.data.colors_dic,
             #     radius_dic=cfg.data.radius_dic,
             # ),
-            ReconLossMonitor(
-                val_freq=cfg.train.val_freq,
-            ),
             DockingTestCallback(
                 dataset=None,  # TODO: implement CrossDockGen & NewBenchmark
                 atom_decoder=cfg.data.atom_decoder,
