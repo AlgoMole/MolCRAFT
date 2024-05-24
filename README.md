@@ -27,6 +27,7 @@ make
 > - Once `make` succeeds, note that exiting from container wound't stop it, nor the tmux sessions running within. To enter an existing container, simply run `make` again. If you need to stop this container, run `make kill`.
 > - For customized environment setup, please refer to files `docker/Dockerfile`, `docker/asset/requirements.txt` and `docker/asset/apt_packages.txt`. 
 > - If your bash does not highlight properly, try `sh -c "$(wget https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)"` to reinstall zsh template.
+> - PoseCheck should be manually installed. See instructions below.
 
 ### Install via Conda
 
@@ -62,7 +63,7 @@ conda install spyrmsd -c conda-forge
 
 > [!NOTE]
 > - If you encounter vina fail, please check `/opt/conda/lib/python3.9/site-packages/vina/vina.py`, line 260, change to `astype(np.int64)`
-> - The latest version of [PoseCheck](https://github.com/cch1999/posecheck) contains some bugs, and installing commit `57a1938` will reproduce our results.
+> - The latest version of [PoseCheck](https://github.com/cch1999/posecheck) uses a different algorithm for calculating strain energy, and installing commit `57a1938` will reproduce our results.
 
 Posecheck may fail to load protein when multiple processes access the same pdb file. A hot fix is by preprocessing all pdb files in advance:
 ```python
