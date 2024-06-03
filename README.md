@@ -208,7 +208,14 @@ You may download the `all_samples.tar.gz` and then `tar xzvf all_samples.tar.gz`
 @article{qu2024molcraft,
   title={MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space},
   author={Qu, Yanru and Qiu, Keyue and Song, Yuxuan and Gong, Jingjing and Han, Jiawei and Zheng, Mingyue and Zhou, Hao and Ma, Wei-Ying},
-  journal={arXiv preprint arXiv:2404.12141},
+  journal={ICML 2024},
+  year={2024}
+}
+
+@article{song2024unified,
+  title={Unified Generative Modeling of 3D Molecules via Bayesian Flow Networks},
+  author={Song, Yuxuan and Gong, Jingjing and Qu, Yanru and Zhou, Hao and Zheng, Mingyue and Liu, Jingjing and Ma, Wei-Ying},
+  journal={ICLR 2024},
   year={2024}
 }
 ```
