@@ -178,7 +178,7 @@ We provide the pretrained checkpoint as [last.ckpt](https://drive.google.com/fil
 ### Sampling for pockets in the testset
 Run `make evaluate -f scripts.mk`, or alternatively,
 ```bash
-python train_bfn.py --config_file configs/test.yaml --exp_name {EXP} --revision {REVISION} --test_only --num_samples {NUM_MOLS_PER_POCKET} --sample_steps 100
+python train_bfn.py --config_file configs/default.yaml --exp_name {EXP} --revision {REVISION} --test_only --num_samples {NUM_MOLS_PER_POCKET} --sample_steps 100
 ```
 
 The output molecules will be saved in `${HOME}/home/logs/{exp_name}/{revision}/test
@@ -188,7 +188,7 @@ _outputs/mols`. If the sampling is run multiple times, there will be several `mo
 To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
 
 ```bash
-python sample_for_pocket.py --config_file configs/test.yaml --protein_path {PDB_ID}_protein.pdb --ligand_path {PDB_ID}_molecule.sdf
+python sample_for_pocket.py --config_file configs/default.yaml --protein_path {PDB_ID}_protein.pdb --ligand_path {PDB_ID}_molecule.sdf
 ```
 
 ## Evaluation
