@@ -16,79 +16,8 @@ import numpy as np
 import os
 from posecheck import PoseCheck
 from copy import deepcopy
-
-
-class ModelResults:
-    def __init__(self, name, full_name, results: list[dict]=None):
-        self.name = name
-        self.full_name = full_name
-        self.results = results
-    
-    def __len__(self):
-        return len(self.results)
-    
-    def __getitem__(self, idx):
-        return self.results[idx]
-
-    @property
-    def smiles_list(self):
-        return np.array([x['smiles'] for x in self.results])
-    
-    @property
-    def complete_list(self):
-        return np.array([x['complete'] for x in self.results])
-
-    @property
-    def validity_list(self):
-        return np.array([x['validity'] for x in self.results])
-
-    @property
-    def center_change_list(self):
-        return np.array([x['center_change'] for x in self.results])
-    
-    @property
-    def mol_pos_range_list(self):
-        return np.array([x['mol_pos_range'] for x in self.results])
-
-    @property
-    def atom_num_list(self):
-        return np.array([x['mol'].GetNumAtoms() for x in self.results])
-
-    @property
-    def qed_list(self):
-        return np.array([(x['chem_results']['qed'] if 'chem_results' in x else np.nan) for x in self.results])
-    
-    @property
-    def sa_list(self):
-        return np.array([(x['chem_results']['sa'] if 'chem_results' in x else np.nan) for x in self.results])
-    
-    @property
-    def logp_list(self):
-        return np.array([(x['chem_results']['logp'] if 'chem_results' in x else np.nan) for x in self.results])
-    
-    @property
-    def lipinski_list(self):
-        return np.array([(x['chem_results']['lipinski'] if 'chem_results' in x else np.nan) for x in self.results])
-
-    @property
-    def vina_score_list(self):
-        return np.array([(x['vina']['score_only'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
-    
-    @property
-    def vina_min_list(self):
-        return np.array([(x['vina']['minimize'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
-    
-    @property
-    def vina_dock_list(self):
-        return np.array([(x['vina']['dock'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
-
-    @property
-    def strain_list(self):
-        return np.array([(x['pose_check']['strain'] if 'pose_check' in x else np.nan) for x in self.results])
-
-    @property
-    def clash_list(self):
-        return np.array([(x['pose_check']['clash'] if 'pose_check' in x else np.nan) for x in self.results])
+from core.evaluation.basic_results import BasicResults
+# from redock_pt_results import redock
 
 
 class CondMolGenMetric(object):
@@ -133,7 +62,7 @@ class CondMolGenMetric(object):
 
     def compute_chem_results(self, generated: list[dict]):
         # chem_list = []
-        pc = None
+        pc = PoseCheck()
         last_protein_fn = None
 
         for item in tqdm(generated, total=len(generated), desc="Chem eval"):
@@ -173,31 +102,29 @@ class CondMolGenMetric(object):
                         if self.docking_config.mode == 'vina_dock':
                             docking_results = vina_task.run(mode='dock', exhaustiveness=self.docking_config.exhaustiveness)
                             vina_results['dock'] = docking_results
-                        # pose_check_results = vina_task.run_pose_check()
                     else:
                         raise NotImplementedError(f"Unknown docking mode: {self.docking_config.mode}")
                     item['vina'] = vina_results
-                    # chem_results.update(pose_check_results)
             except Exception as e:
                 print(f'[VINA FAIL] {e}')
 
             try:
-                protein_fn = os.path.join(
-                    self.docking_config.protein_root,
-                    os.path.dirname(ligand_filename),
-                    os.path.basename(ligand_filename)[:10] + '.pdb'
-                )
-                if protein_fn != last_protein_fn:
-                    del pc
-                    pc = PoseCheck()
-                    pc.load_protein_from_pdb(protein_fn)
-                    last_protein_fn = protein_fn
                 pc.load_ligands_from_mols([mol])
                 strain = pc.calculate_strain_energy()[0]
-                clash = pc.calculate_clashes()[0]
+                # protein_fn = os.path.join(
+                #     self.docking_config.protein_root,
+                #     os.path.dirname(ligand_filename),
+                #     os.path.basename(ligand_filename)[:10] + '.pdb'
+                # )
+                # if protein_fn != last_protein_fn:
+                #     del pc
+                #     pc = PoseCheck()
+                #     pc.load_protein_from_pdb(protein_fn)
+                #     last_protein_fn = protein_fn
+                # clash = pc.calculate_clashes()[0]
                 item['pose_check'] = {
                     'strain': strain,
-                    'clash': clash,
+                    # 'clash': clash,
                 }
             except Exception as e:
                 print(f'[POSE CHECK FAIL] {e}')
@@ -215,6 +142,8 @@ class CondMolGenMetric(object):
 
         self.compute_chem_results(generated)  # TargetDiff reconstruction
 
+        # redock(generated)
+
         metrics = {
             # **recon_dict,
             **stability_dict,
@@ -230,7 +159,7 @@ class CondMolGenMetric(object):
                 f'{name}_fail': n_isnan / n_total,
                 f'{name}_mean': np.mean(arr2)
             }
-        results = ModelResults('bfn', 'molcraft', generated)
+        results = BasicResults('bfn', 'molcraft', generated)
 
         metrics.update(stat1(results.qed_list, 'qed'))
         metrics.update(stat1(results.sa_list, 'sa'))
@@ -254,10 +183,10 @@ class CondMolGenMetric(object):
             # vina_dock = res['vina']['dock'][0]['affinity']
             if 'pose_check' in res:
                 strain = res['pose_check']['strain']
-                clash = res['pose_check']['clash']
+                # clash = res['pose_check']['clash']
             else:
                 strain = np.nan
-                clash = np.nan
+                # clash = np.nan
             mol.SetProp('_Name', ligand_filename)
             mol.SetProp('atom_num', str(atom_num))
             mol.SetProp('center_change', str(center_change))
@@ -268,7 +197,7 @@ class CondMolGenMetric(object):
             mol.SetProp('vina_score', str(vina_score))
             mol.SetProp('vina_min', str(vina_min))
             mol.SetProp('strain', str(strain))
-            mol.SetProp('clash', str(clash))
+            # mol.SetProp('clash', str(clash))
             with Chem.SDWriter(os.path.join(bad_case_dir, f'{idx}.sdf')) as w:
                 w.write(mol)
 
@@ -284,13 +213,13 @@ class CondMolGenMetric(object):
                         pos_vina_msg[ligand_filename] = ''
                     
                     _ = deepcopy(res)
-                    del _['pred_pos'], _['pred_v'], _['is_aromatic'], _['mol']
+                    del _['pred_pos'], _['pred_v'], _['is_aromatic'], _['mol'], _['protein_center'], _['mol_center']
                     _['vina'] = {
                         'vina_score': vina_score,
                         'vina_minimize': vina_min,
                     }
                     
-                    pos_vina_msg[ligand_filename] += f'{idx} {_}\n'
+                    pos_vina_msg[ligand_filename] += f'{idx} {_}\n\n'
                     save_bad_case(idx, res)
             except Exception as e:
                 if ligand_filename not in no_vina_msg:
@@ -341,7 +270,7 @@ class CondMolGenMetric(object):
                 f'{name}_75': perc[2],
             }
 
-        metrics.update(stat1(results.clash_list, 'clash'))
+        # metrics.update(stat1(results.clash_list, 'clash'))
         metrics.update(stat3(results.strain_list, 'strain'))
     
         return metrics
