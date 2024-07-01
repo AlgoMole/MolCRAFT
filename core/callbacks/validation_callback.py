@@ -18,7 +18,7 @@ import copy
 import glob
 import shutil
 
-from core.evaluation.metrics import CondMolGenMetric, ModelResults
+from core.evaluation.metrics import CondMolGenMetric
 from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
 from core.evaluation.visualization import visualize, visualize_chain
 from core.utils import transforms as trans
@@ -547,5 +547,14 @@ class DockingTestCallback(Callback):
         out_metrics.update(recon_dict)
         out_metrics = {f'test/{k}': v for k, v in out_metrics.items()}
         pl_module.log_dict(out_metrics)
+
+        out_metrics['ckpt_path'] = pl_module.cfg.evaluation.ckpt_path
+        out_metrics['test_outputs_dir'] = path
+        out_metrics['sample_num_atoms'] = pl_module.cfg.evaluation.sample_num_atoms
         print(json.dumps(out_metrics, indent=4))
         json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
+
+        # result_path = pl_module.cfg.evaluation.result_path
+        # if result_path is not None:
+        #     with open(result_path, 'a') as fout:
+        #         fout.write(json.dumps(out_metrics, indent=4) + '\n')

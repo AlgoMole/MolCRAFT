@@ -128,7 +128,10 @@ def set_test_output_dir(cfg):
     while os.path.exists(path):
         version += 1
         path = cfg.accounting.test_outputs_dir + f'_v{version}'
-    print(f'{cfg.accounting.test_outputs_dir} already exists, change test_output_dir to {path}')
+    if version > 0:
+        print(f'{cfg.accounting.test_outputs_dir} already exists, change test_output_dir to {path}')
+    else:
+        print(f'set test_output_dir as {path}')
     cfg.accounting.test_outputs_dir = path
     os.makedirs(cfg.accounting.test_outputs_dir, exist_ok=True)
 
