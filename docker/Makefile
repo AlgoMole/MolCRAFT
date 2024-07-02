@@ -73,6 +73,8 @@ _instantiate_container:
 		mkdir -p ${HOME}/vscode/vscode-remote-containers; fi 
 	if ! docker container ls | grep -w ${CONTRAINER_NAME}; then \
 		docker run -itd --rm --shm-size=256g \
+			-p 7860:7860 \
+			-v /sharefs/share:/sharefs/share \
 			-v ${SHARE_DIR}:${TO_SHARE_DIR} \
 			-v ${HOME}/.netrc:${CHOME}/.netrc \
 			-v ${HOME}/.zsh_history:${CHOME}/.zsh_history \
@@ -126,4 +128,3 @@ _setup_gitconfig:
 		fi; \
 		cp ~/.gitconfig asset/gitconfig; \
 	fi
-	
