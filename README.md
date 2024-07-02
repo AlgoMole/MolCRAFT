@@ -202,6 +202,13 @@ We provide samples for all SBDD baselines in the [sample](https://drive.google.c
 
 You may download the `all_samples.tar.gz` and then `tar xzvf all_samples.tar.gz`, which extracts all the pt files into `samples` folder for evaluation.
 
+## Demo
+### Host our web app demo locally
+
+With ``gradio`` and ``gradio_molecule3d`` installed, you can simply run ``python app.py`` to open the demo locally. Port mapping has been set in Makefile if you are using docker. You should also forward this port if you run the docker in an ssh server. We will share a permanent demo link later.
+
+Great thanks to @duerrsimon for his kind support in resolving rendering issues!
+
 ## Citation
 
 ```

@@ -155,28 +155,21 @@ class Metrics:
         chem_results = {}
 
         try:
-            print(111)
             # qed, logp, sa, lipinski, ring size, etc
             chem_results.update(scoring_func.get_chem(mol))
             chem_results['atom_num'] = mol.GetNumAtoms()
-            print(222)
 
             # docking                
             vina_task = VinaDockingTask.from_generated_mol(
                 mol, ligand_filename=self.ref_ligand_fn, protein_root='./')
-            print(333)
             score_only_results = vina_task.run(mode='score_only', exhaustiveness=self.exhaustiveness)
-            print(444)
             minimize_results = vina_task.run(mode='minimize', exhaustiveness=self.exhaustiveness)
-            print(555)
             docking_results = vina_task.run(mode='dock', exhaustiveness=self.exhaustiveness)
-            print(666)
 
             chem_results['vina_score'] = score_only_results[0]['affinity']
             chem_results['vina_minimize'] = minimize_results[0]['affinity']
             chem_results['vina_dock'] = docking_results[0]['affinity']
             # chem_results['vina_dock_pose'] = docking_results[0]['pose']
-            print(777)
             return chem_results
         except Exception as e:
             print(e)
