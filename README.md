@@ -187,8 +187,10 @@ _outputs/mols`. If the sampling is run multiple times, there will be several `mo
 ### Sampling from pdb file
 To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
 
+Here is an example. The first argument is the protein pdb path, the second argument is the ligand sdf path, and you can choose your own checkpoint by changing the parameters in ``call()`` of ``sample_for_pocket_v2.py``.
+
 ```bash
-python sample_for_pocket.py --config_file configs/default.yaml --protein_path {PDB_ID}_protein.pdb --ligand_path {PDB_ID}_molecule.sdf
+python sample_for_pocket_v2.py data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec.pdb data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0.sdf
 ```
 
 ## Evaluation
