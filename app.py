@@ -43,7 +43,7 @@ reps = [
     # }
 ]
 
-from sample_for_pocket_v2 import call, OUT_DIR, Metrics
+from sample_for_pocket_v2 import call, OUT_DIR, Metrics, NpEncoder
 # from rdkit import Chem
 import json
 
@@ -64,17 +64,6 @@ def show(value: str, out_fn: str):
     # props = sdf_mol.GetPropsAsDict()
 
     return [protein_path, out_fn]
-
-
-class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return super(NpEncoder, self).default(obj)
     
 
 def evaluate(value: str, out_fn: str):

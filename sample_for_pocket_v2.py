@@ -1,5 +1,7 @@
 # import argparse
 import os
+import sys
+import json
 # import shutil
 
 # import torch
@@ -93,7 +95,7 @@ def get_dataloader_from_pdb(cfg):
     return test_loader
 
 
-def call(protein_fn, ligand_fn, 
+def call(protein_fn, ligand_fn, ckpt_path='./checkpoints/last.ckpt',
          num_samples=10, sample_steps=100, sample_num_atoms='prior', 
          beta1=1.5, sigma1_coord=0.03, sampling_strategy='end_back', seed=1234):
     
@@ -102,6 +104,7 @@ def call(protein_fn, ligand_fn,
     
     cfg.evaluation.protein_path = protein_fn
     cfg.evaluation.ligand_path = ligand_fn
+    cfg.evaluation.ckpt_path = ckpt_path
     cfg.test_only = True
     cfg.no_wandb = True
     cfg.evaluation.num_samples = num_samples
@@ -247,3 +250,23 @@ class Metrics:
 
         return chem_results
 
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
+if __name__ == '__main__':
+    protein_path = sys.argv[1]
+    ligand_path = sys.argv[2]
+
+    call(protein_path, ligand_path)
+    out_fn = 'output/0.sdf'
+    metrics = Metrics(protein_path, ligand_path, out_fn).evaluate()
+    print(json.dumps(metrics, indent=4, cls=NpEncoder))
