@@ -148,3 +148,4 @@ docker/*.sh
 gitconfig
 logs/
 pt_results
+output/
