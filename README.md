@@ -74,15 +74,15 @@ python train_bfn.py --config_file configs/default.yaml --exp_name {EXP} --revisi
 ```
 
 The output molecules will be saved in `${HOME}/home/logs/{exp_name}/{revision}/test
-_outputs/mols`. If the sampling is run multiple times, there will be several `mols-v{version_number}` folders.
+_outputs/mols-v{version_number}` folders.
 
 ### Sampling from pdb file
 To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
 
-Here is an example. The first argument is the protein pdb path, the second argument is the ligand sdf path, and you can choose your own checkpoint by changing the parameters in ``call()`` of ``sample_for_pocket.py``.
+Below is an example that stores the generated 10 molecules under `output` folder. The configurations are managed in the ``call()`` function of ``sample_for_pocket.py``.
 
 ```bash
-python sample_for_pocket.py data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec.pdb data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0.sdf
+python sample_for_pocket.py ${PDB_PATH} ${SDF_PATH}
 ```
 
 ## Evaluation
