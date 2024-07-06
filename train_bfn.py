@@ -263,10 +263,10 @@ if __name__ == "__main__":
             tr_cfg.dynamics.sampling_strategy = cfg.dynamics.sampling_strategy
             tr_cfg.data = cfg.data
             tr_cfg.seed = cfg.seed
+            tr_cfg.data.name = 'pl'
             cfg = tr_cfg
         if not hasattr(cfg.train, 'max_grad_norm'):
             cfg.train.max_grad_norm = 'Q'
-        cfg.save2yaml(os.path.join(cfg.accounting.test_outputs_dir, 'config.yaml'))
     else:
         cfg.save2yaml(cfg.accounting.dump_config_path)
 
