@@ -261,13 +261,6 @@ if __name__ == "__main__":
             tr_cfg.dynamics.beta1 = cfg.dynamics.beta1
             tr_cfg.dynamics.sigma1_coord = cfg.dynamics.sigma1_coord
             tr_cfg.dynamics.sampling_strategy = cfg.dynamics.sampling_strategy
-            if hasattr(cfg.dynamics, 'guide_mode'):
-                tr_cfg.dynamics.guide_mode = cfg.dynamics.guide_mode
-                tr_cfg.dynamics.objective = cfg.dynamics.objective
-                tr_cfg.dynamics.pos_grad_weight = cfg.dynamics.pos_grad_weight
-                tr_cfg.dynamics.type_grad_weight = cfg.dynamics.type_grad_weight
-                if cfg.dynamics.guide_mode is not None:
-                    tr_cfg.evaluation.batch_size = 4
             tr_cfg.data = cfg.data
             tr_cfg.seed = cfg.seed
             cfg = tr_cfg
