@@ -45,7 +45,7 @@ data:
 ## Training
 Run `make -f scripts.mk` (without the need for data preparation), or alternatively (with data folder correctly configured),
 ```bash
-python train_bfn.py --exp_name {EXP} --revision {REVISION}
+python train_bfn.py --exp_name ${EXP_NAME} --revision ${REVISION}
 ```
 
 where the default values should be set the same as:
@@ -67,17 +67,17 @@ python train_bfn.py --no_wandb --debug --epochs 1
 
 ## Sampling
 We provide the pretrained checkpoint as [last.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
+
 ### Sampling for pockets in the testset
 Run `make evaluate -f scripts.mk`, or alternatively,
 ```bash
-python train_bfn.py --config_file configs/default.yaml --exp_name {EXP} --revision {REVISION} --test_only --num_samples {NUM_MOLS_PER_POCKET} --sample_steps 100
+python train_bfn.py --config_file configs/default.yaml --exp_name ${EXP_NAME} --revision ${REVISION} --test_only --num_samples ${NUM_MOLS_PER_POCKET} --sample_steps 100
 ```
 
-The output molecules will be saved in `${HOME}/home/logs/{exp_name}/{revision}/test
-_outputs/mols-v{version_number}` folders.
+The output molecules `vina_docked.pt` for all 100 test pockets will be saved in `./logs/${USER}_bfn_sbdd/${EXP_NAME}/${REVISION}/test_outputs/${TIMESTAMP}` folders.
 
 ### Sampling from pdb file
-To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference ligand).
+To sample from a whole protein pdb file, we need the corresponding reference ligand to clip the protein pocket (a 10A region around the reference position).
 
 Below is an example that stores the generated 10 molecules under `output` folder. The configurations are managed in the ``call()`` function of ``sample_for_pocket.py``.
 
