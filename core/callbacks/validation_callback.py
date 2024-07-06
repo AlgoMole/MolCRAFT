@@ -17,6 +17,7 @@ import wandb
 import copy
 import glob
 import shutil
+import time
 
 from core.evaluation.metrics import CondMolGenMetric
 from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
@@ -527,15 +528,13 @@ class DockingTestCallback(Callback):
             return
 
         path = pl_module.cfg.accounting.test_outputs_dir
-        # initiate log_dir together with test_otuput_dir
-        # version = 0
-        # while os.path.exists(path):
-        #     version += 1
-        #     path = pl_module.cfg.accounting.test_outputs_dir + f'_v{version}'
-        if os.path.exists(path):
-            shutil.rmtree(path)
-        print(f'saving results to {path}')
-        os.makedirs(path, exist_ok=True)
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        path = os.path.join(path, timestr)
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+
+        # dump config
+        pl_module.cfg.save2yaml(os.path.join(path, 'config.yaml'))
         torch.save(results, os.path.join(path, f'generated.pt'))
 
         bad_case_dir = os.path.join(path, 'bad_cases')
@@ -554,7 +553,3 @@ class DockingTestCallback(Callback):
         print(json.dumps(out_metrics, indent=4))
         json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
 
-        # result_path = pl_module.cfg.evaluation.result_path
-        # if result_path is not None:
-        #     with open(result_path, 'a') as fout:
-        #         fout.write(json.dumps(out_metrics, indent=4) + '\n')
