@@ -1,5 +1,5 @@
 # MolCRAFT
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/AlgoMole/MolCRAFT/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/AlgoMole/MolCRAFT/blob/master/LICENSE)
 
 Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
