@@ -141,10 +141,10 @@ checkpoints/
 ssh/
 gitconfig
 samples/
-ssh/
 docker/gitconfig
 docker/asset/ssh/
 docker/*.sh
-gitconfig
 logs/
 pt_results
+input/
+output/

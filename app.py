@@ -4,15 +4,41 @@ import gradio as gr
 from gradio_molecule3d import Molecule3D
 
 import os
+import shutil
 
 
-def load(value: str):
-    full_pdb_path = value
-    sdf_path = glob.glob(full_pdb_path.rstrip('.pdb') + '*.sdf')
+def copy_file_from_tmp_to_input(tmp_file_path):
+    if not os.path.exists('./input'):
+      os.makedirs('./input', exist_ok=True)
+    if not os.path.exists('./output'):
+      os.makedirs('./output', exist_ok=True)
+    dst = os.path.join('./input', os.path.basename(tmp_file_path))
+    shutil.copyfile(tmp_file_path, dst)
+    return dst
+
+def load(dropdown_value: str, upload_value: list):
+    pdb_path = dropdown_value
+    sdf_path = glob.glob(pdb_path.rstrip('.pdb') + '*.sdf')
     # print(sdf_path)
     assert len(sdf_path) == 1
     sdf_path = sdf_path[0]
-    return [full_pdb_path, sdf_path]
+
+    if upload_value is not None and type(upload_value) == list and len(upload_value) == 2:
+      flag = False
+      if upload_value[0].endswith('.pdb') and upload_value[1].endswith('.sdf'):
+        tmp_pdb_path, tmp_sdf_path = upload_value
+        flag = True
+      elif upload_value[0].endswith('.sdf') and upload_value[1].endswith('.pdb'):
+        tmp_sdf_path, tmp_pdb_path = upload_value
+        flag = True
+      if flag:
+        print(upload_value)
+        pdb_path = copy_file_from_tmp_to_input(tmp_pdb_path)
+        sdf_path = copy_file_from_tmp_to_input(tmp_sdf_path)
+
+    print(pdb_path)
+    print(sdf_path)
+    return [pdb_path, sdf_path]
 
 pdb_files = glob.glob("./data/test_set/*/*.pdb")
 pdb_files = [f for f in pdb_files if 'ligand' not in f and 'complex' not in f]
@@ -43,13 +69,13 @@ reps = [
     # }
 ]
 
-from sample_for_pocket_v2 import call, OUT_DIR, Metrics, NpEncoder
+from sample_for_pocket import call, OUT_DIR, Metrics, NpEncoder
 # from rdkit import Chem
 import json
 
 
-def generate(value: str):
-    protein_path, ligand_path = load(value)
+def generate(dropdown_value: str, upload_value: list):
+    protein_path, ligand_path = load(dropdown_value, upload_value)
     call(protein_path, ligand_path)
     
     out_fns = sorted(glob.glob(f'{OUT_DIR}/*.sdf'))
@@ -57,8 +83,8 @@ def generate(value: str):
     # return out_fns
 
 
-def show(value: str, out_fn: str):
-    protein_path, ligand_path = load(value)
+def show(dropdown_value: str, upload_value: list, out_fn: str):
+    protein_path, ligand_path = load(dropdown_value, upload_value)
     # sdf_mol = Chem.SDMolSupplier(out_fn, removeHs=False)[0]
     # # get all properties from sdf_mol
     # props = sdf_mol.GetPropsAsDict()
@@ -66,34 +92,40 @@ def show(value: str, out_fn: str):
     return [protein_path, out_fn]
     
 
-def evaluate(value: str, out_fn: str):
-    protein_path, ligand_path = load(value)
+def evaluate(dropdown_value: str, upload_value: list, out_fn: str):
+    protein_path, ligand_path = load(dropdown_value, upload_value)
     metrics = Metrics(protein_path, ligand_path, out_fn).evaluate()
     return json.dumps(metrics, indent=4, cls=NpEncoder)
 
 
 
-with gr.Blocks() as demo:
+with gr.Blocks(
+      title='MolCRAFT',
+      css=".gradio-container, .gradio-container button {} footer {visibility: hidden}"
+    ) as demo:
     gr.Markdown("# MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space [ICML 2024]")
-    dropdown = gr.Dropdown(label="choose a pdb from CrossDocked test set:", choices=pdb_files, value=np.random.choice(pdb_files))
-    ref_complex = Molecule3D(label="Protein Pocket & Reference Ligand", reps=reps)
+    with gr.Row():
+        dropdown = gr.Dropdown(label="Option 1: choose a pdb from CrossDocked test set:", choices=pdb_files, value=np.random.choice(pdb_files))
+        upload = gr.UploadButton("Option 2: upload a pdb (protein) AND an sdf (ligand)", file_count="multiple")
+  
     # out_ligand = Molecule3D(label='reference molecule', reps=reps)
 
-    btn1 = gr.Button("visualize reference ligand in complex")
-    btn1.click(load, inputs=dropdown, outputs=ref_complex)
+    btn1 = gr.Button("Visualize reference ligand in complex")
+    ref_complex = Molecule3D(label="Protein Pocket & Reference Ligand", reps=reps)
+    btn1.click(load, inputs=[dropdown, upload], outputs=ref_complex)
 
-    btn2 = gr.Button('generate')
+    btn2 = gr.Button('Generate 10 ligands (~30s)')
     OUT_FILES = [f'./output/{i}.sdf' for i in range(10)]
-    candidates = gr.Dropdown(label="choose a generated molecule:", choices=OUT_FILES, value=OUT_FILES[0], interactive=True)
-    btn2.click(generate, inputs=[dropdown], outputs=[candidates])
+    candidates = gr.Dropdown(label="Choose a generated molecule:", choices=OUT_FILES, value=OUT_FILES[0], interactive=True)
+    btn2.click(generate, inputs=[dropdown, upload], outputs=[candidates])
 
+    btn3 = gr.Button('Visualize generated ligand in complex (run "generate" first)')
     gen_complex = Molecule3D(label='Generated Molecule', reps=reps)
-    btn3 = gr.Button('visualize generated ligand in complex (should run "generate" at first)')
-    btn3.click(show, inputs=[dropdown, candidates], outputs=[gen_complex])
+    btn3.click(show, inputs=[dropdown, upload, candidates], outputs=[gen_complex])
 
-    metrics = gr.Textbox(label='metrics')
-    btn4 = gr.Button('evaluate (this could be time consuming)')
-    btn4.click(evaluate, inputs=[dropdown, candidates], outputs=[metrics])
+    btn4 = gr.Button('Evaluate this generated ligand (1-2 minutes)')
+    metrics = gr.Textbox(label='Metrics')
+    btn4.click(evaluate, inputs=[dropdown, upload, candidates], outputs=[metrics])
 
     gr.Markdown(
 """
@@ -115,4 +147,4 @@ with gr.Blocks() as demo:
     )
     
 if __name__ == '__main__':
-    demo.launch(share=True)
+    demo.launch(server_name="0.0.0.0", server_port=10990, favicon_path="favicon.png")

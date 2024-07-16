@@ -1,23 +1,23 @@
-import argparse
+# import argparse
 import os
-import shutil
+import sys
+import json
+# import shutil
 
-import torch
+# import torch
 
-from sklearn.metrics import roc_auc_score
+# from sklearn.metrics import roc_auc_score
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose
 
-import datetime, pytz
+# import datetime, pytz
 
 from core.config.config import Config, parse_config
 from core.models.sbdd_train_loop import SBDDTrainLoop
-from core.callbacks.basic import RecoverCallback, GradientClip, NormalizerCallback, EMACallback
-from core.callbacks.validation_callback import (
-    ValidationCallback,
-    VisualizeMolAndTrajCallback,
-    ReconLossMonitor,
+from core.callbacks.basic import NormalizerCallback
+from core.callbacks.validation_callback_for_sample import (
     DockingTestCallback,
+    OUT_DIR
 )
 
 import core.utils.transforms as trans
@@ -27,13 +27,16 @@ from core.datasets.pl_data import FOLLOW_BATCH
 
 import pytorch_lightning as pl
 
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning import seed_everything
-from pytorch_lightning.profilers import SimpleProfiler, PyTorchProfiler
 
-from absl import logging
-import glob
+# from absl import logging
+# import glob
+
+from core.evaluation.utils import scoring_func
+from core.evaluation.docking_vina import VinaDockingTask
+from posecheck import PoseCheck
+import numpy as np
+from rdkit import Chem
 
 
 def get_dataloader_from_pdb(cfg):
@@ -43,6 +46,11 @@ def get_dataloader_from_pdb(cfg):
     # load protein and ligand
     protein = PDBProtein(protein_fn)
     ligand_dict = parse_sdf_file(ligand_fn)
+    lig_pos = ligand_dict["pos"]
+
+    print('[DEBUG] get_dataloader')
+    print(lig_pos.shape, lig_pos.mean(axis=0))
+
     pdb_block_pocket = protein.residues_to_pdb_block(
         protein.query_residues_ligand(ligand_dict, cfg.dynamics.net_config.r_max)
     )
@@ -87,123 +95,32 @@ def get_dataloader_from_pdb(cfg):
     return test_loader
 
 
-def get_logger(cfg):
-    os.makedirs(cfg.accounting.wandb_logdir, exist_ok=True)
-    # TODO save code
-    if cfg.wandb_resume_id is not None:
-        wandb_logger = WandbLogger(
-            id=cfg.wandb_resume_id,
-            project=cfg.project_name,
-            offline=cfg.no_wandb,
-            save_dir=cfg.accounting.wandb_logdir,
-            resume='must',
-        )
-    else: # start a new run
-        wandb_logger = WandbLogger(
-            name=f"{cfg.exp_name}_{cfg.revision}"
-            + f'_{datetime.datetime.now(pytz.timezone("Asia/Shanghai")).strftime("%Y-%m-%d-%H:%M:%S")}',
-            project=cfg.project_name,
-            offline=cfg.no_wandb,
-            save_dir=cfg.accounting.wandb_logdir,
-        )  # add wandb parameters
-    return wandb_logger
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-    # meta
-    parser.add_argument("--config_file", type=str, default="configs/default.yaml",)
-    # parser.add_argument('--train_report_iter', type=int, default=200)
-    parser.add_argument("--exp_name", type=str, default="debug")
-    parser.add_argument("--revision", type=str, default="default")
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--wandb_resume_id", type=str, default=None)
-    parser.add_argument('--empty_folder', action='store_true')
-    parser.add_argument("--test_only", action="store_true")
+def call(protein_fn, ligand_fn, ckpt_path='./checkpoints/last.ckpt',
+         num_samples=10, sample_steps=100, sample_num_atoms='prior', 
+         beta1=1.5, sigma1_coord=0.03, sampling_strategy='end_back', seed=1234):
     
-    # global config
-    parser.add_argument('--seed', type=int, default=1234)
-    parser.add_argument("--no_wandb", action="store_true")
-    parser.add_argument("--logging_level", type=str, default="warning")
-
-    # train data params
-    parser.add_argument('--random_rot', action='store_true')
-    parser.add_argument("--pos_noise_std", type=float, default=0)    
-    parser.add_argument("--pos_normalizer", type=float, default=2.0)    
-    
-    # train params
-    parser.add_argument("--batch_size", type=int, default=8)
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument('--v_loss_weight', type=float, default=1)
-    parser.add_argument('--lr', type=float, default=5e-4)
-    parser.add_argument('--scheduler', type=str, default='plateau', choices=['cosine', 'plateau'])
-    parser.add_argument('--weight_decay', type=float, default=0)
-    parser.add_argument('--max_grad_norm', type=str, default='Q')  # '8.0' for
-
-    # bfn params
-    parser.add_argument("--sigma1_coord", type=float, default=0.03)
-    parser.add_argument("--beta1", type=float, default=1.5)
-    # parser.add_argument("--no_diff_coord", type=eval, default=False)
-    # parser.add_argument("--charge_discretised_loss", type=eval, default=False)
-    parser.add_argument("--t_min", type=float, default=0.0001)
-    parser.add_argument('--use_discrete_t', action="store_true")
-    parser.add_argument('--discrete_steps', type=int, default=1000)
-    parser.add_argument('--destination_prediction', action="store_true")
-    parser.add_argument('--sampling_strategy', type=str, default='end_back_pmf') #vanilla or end_back
-
-    parser.add_argument(
-        "--time_emb_mode", type=str, default="simple", choices=["simple", "sin", 'rbf', 'rbfnn']
-    )
-    parser.add_argument("--time_emb_dim", type=int, default=1)
-    parser.add_argument('--pos_init_mode', type=str, default='zero', choices=['zero', 'randn'])
-
-    # eval params
-    parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--sample_steps", type=int, default=100)
-    parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
-    parser.add_argument("--visual_chain", action="store_true")
-    parser.add_argument("--protein_path", type=str, default=None)
-    parser.add_argument("--ligand_path", type=str, default=None)
-    parser.add_argument("--docking_mode", type=str, default="vina_score", choices=['vina_score', 'vina_dock'])
-
-    _args = parser.parse_args()
-    cfg = Config(**_args.__dict__)
+    cfg = Config('./checkpoints/config.yaml')
     seed_everything(cfg.seed)
-
-    logging_level = {
-        "info": logging.INFO,
-        "debug": logging.DEBUG,
-        "warning": logging.WARNING,
-        "error": logging.ERROR,
-        "fatal": logging.FATAL,
-    }
-    logging.set_verbosity(logging_level[cfg.logging_level])
-
-    if cfg.empty_folder:
-        shutil.rmtree(cfg.accounting.logdir)
-
-    wandb_logger = get_logger(cfg)
-        
-    test_loader = get_dataloader_from_pdb(cfg)
-    wandb_logger.log_hyperparams(cfg.todict())
     
-    tr_cfg = Config(cfg.accounting.dump_config_path)
-    tr_cfg.test_only = cfg.test_only
-    tr_cfg.evaluation = cfg.evaluation
-    tr_cfg.visual = cfg.visual
-    tr_cfg.accounting = cfg.accounting
-    # TODO: temporarily test different beta1 and sigma1_coord
-    tr_cfg.dynamics.beta1 = cfg.dynamics.beta1
-    tr_cfg.dynamics.sigma1_coord = cfg.dynamics.sigma1_coord
-    tr_cfg.dynamics.sampling_strategy = cfg.dynamics.sampling_strategy
-    tr_cfg.seed = cfg.seed
-    cfg = tr_cfg
-    if not hasattr(cfg.train, 'max_grad_norm'):
-        cfg.train.max_grad_norm = 'Q'
+    cfg.evaluation.protein_path = protein_fn
+    cfg.evaluation.ligand_path = ligand_fn
+    cfg.evaluation.ckpt_path = ckpt_path
+    cfg.test_only = True
+    cfg.no_wandb = True
+    cfg.evaluation.num_samples = num_samples
+    cfg.evaluation.sample_steps = sample_steps
+    cfg.evaluation.sample_num_atoms = sample_num_atoms # or 'prior'
+    cfg.dynamics.beta1 = beta1
+    cfg.dynamics.sigma1_coord = sigma1_coord
+    cfg.dynamics.sampling_strategy = sampling_strategy
+    cfg.seed = seed
+    cfg.train.max_grad_norm = 'Q'
 
-    print(f"The config of this process is:\n{cfg}")
+    # print(f"The config of this process is:\n{cfg}")
+
+    print(protein_fn, ligand_fn)
+    test_loader = get_dataloader_from_pdb(cfg)
+    # wandb_logger.log_hyperparams(cfg.todict())
 
     model = SBDDTrainLoop(config=cfg)
 
@@ -212,31 +129,10 @@ if __name__ == "__main__":
         max_epochs=cfg.train.epochs,
         check_val_every_n_epoch=cfg.train.ckpt_freq,
         devices=1,
-        logger=wandb_logger,
+        # logger=wandb_logger,
         num_sanity_val_steps=0,
         callbacks=[
-            RecoverCallback(
-                latest_ckpt=os.path.join(cfg.accounting.checkpoint_dir, "last.ckpt"),
-                resume=cfg.train.resume,
-                recover_trigger_loss=1e7,
-            ),
             NormalizerCallback(normalizer_dict=cfg.data.normalizer_dict),
-            ValidationCallback(
-                dataset=None,  # TODO: implement CrossDockGen & NewBenchmark
-                atom_decoder=cfg.data.atom_decoder,
-                atom_enc_mode=cfg.data.transform.ligand_atom_mode,
-                atom_type_one_hot=False,
-                single_bond=True,
-                docking_config=cfg.evaluation.docking_config,
-            ),
-            VisualizeMolAndTrajCallback(
-                atom_decoder=cfg.data.atom_decoder,
-                colors_dic=cfg.data.colors_dic,
-                radius_dic=cfg.data.radius_dic,
-            ),
-            ReconLossMonitor(
-                val_freq=cfg.train.val_freq,
-            ),
             DockingTestCallback(
                 dataset=None,  # TODO: implement CrossDockGen & NewBenchmark
                 atom_decoder=cfg.data.atom_decoder,
@@ -245,25 +141,132 @@ if __name__ == "__main__":
                 single_bond=True,
                 docking_config=cfg.evaluation.docking_config,
             ),
-            ModelCheckpoint(
-                # monitor="val/recon_loss",
-                # every_n_train_steps=cfg.train.val_freq,
-                monitor="val/mol_stable",
-                every_n_epochs=cfg.train.ckpt_freq,
-                dirpath=cfg.accounting.checkpoint_dir,
-                filename="epoch{epoch:02d}-val_loss{val/recon_loss:.2f}-mol_stable{val/mol_stable:.2f}-complete{val/completeness:.2f}",
-                save_top_k=3,
-                mode="max",
-                auto_insert_metric_name=False,
-                save_last=True,
-            ),
-            EMACallback(decay=cfg.train.ema_decay, ema_device="cuda"),
         ],
     )
 
-    ckpts = glob.glob(os.path.join(cfg.accounting.checkpoint_dir, "*complete*"))
-    best_ckpt = sorted(ckpts, key=lambda x: float(x.split("complete")[-1][:4]))[-1]
-    # best_ckpt = sorted(ckpts, key=lambda x: float(x.split("val_loss")[-1][:4]))[0]
-    print(f"Detected best_ckpt: {best_ckpt}")
-    trainer.test(model, dataloaders=test_loader, ckpt_path=best_ckpt)
+    trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
 
+
+class Metrics:
+    def __init__(self, protein_fn, ref_ligand_fn, ligand_fn):
+        self.protein_fn = protein_fn
+        self.ref_ligand_fn = ref_ligand_fn
+        self.ligand_fn = ligand_fn
+        self.exhaustiveness = 16
+
+    def vina_dock(self, mol):
+        chem_results = {}
+
+        try:
+            # qed, logp, sa, lipinski, ring size, etc
+            chem_results.update(scoring_func.get_chem(mol))
+            chem_results['atom_num'] = mol.GetNumAtoms()
+
+            # docking                
+            vina_task = VinaDockingTask.from_generated_mol(
+                mol, ligand_filename=self.ref_ligand_fn, protein_root='./')
+            score_only_results = vina_task.run(mode='score_only', exhaustiveness=self.exhaustiveness)
+            minimize_results = vina_task.run(mode='minimize', exhaustiveness=self.exhaustiveness)
+            docking_results = vina_task.run(mode='dock', exhaustiveness=self.exhaustiveness)
+
+            chem_results['vina_score'] = score_only_results[0]['affinity']
+            chem_results['vina_minimize'] = minimize_results[0]['affinity']
+            chem_results['vina_dock'] = docking_results[0]['affinity']
+            # chem_results['vina_dock_pose'] = docking_results[0]['pose']
+            return chem_results
+        except Exception as e:
+            print(e)
+        
+        return chem_results
+
+    def pose_check(self, mol):
+        pc = PoseCheck()
+
+        pose_check_results = {}
+
+        protein_ready = False
+        try:
+            pc.load_protein_from_pdb(self.protein_fn)
+            protein_ready = True
+        except ValueError as e:
+            return pose_check_results
+
+        ligand_ready = False
+        try:
+            pc.load_ligands_from_mols([mol])
+            ligand_ready = True
+        except ValueError as e:
+            return pose_check_results
+
+        if ligand_ready:
+            try:
+                strain = pc.calculate_strain_energy()[0]
+                pose_check_results['strain'] = strain
+            except Exception as e:
+                pass
+
+        if protein_ready and ligand_ready:
+            try:
+                clash = pc.calculate_clashes()[0]
+                pose_check_results['clash'] = clash
+            except Exception as e:
+                pass
+
+            try:
+                df = pc.calculate_interactions()
+                columns = np.array([column[2] for column in df.columns])
+                flags = np.array([df[column][0] for column in df.columns])
+                
+                def count_inter(inter_type):
+                    if len(columns) == 0:
+                        return 0
+                    count = sum((columns == inter_type) & flags)
+                    return count
+
+                # ['Hydrophobic', 'HBDonor', 'VdWContact', 'HBAcceptor']
+                hb_donor = count_inter('HBDonor')
+                hb_acceptor = count_inter('HBAcceptor')
+                vdw = count_inter('VdWContact')
+                hydrophobic = count_inter('Hydrophobic')
+
+                pose_check_results['hb_donor'] = hb_donor
+                pose_check_results['hb_acceptor'] = hb_acceptor
+                pose_check_results['vdw'] = vdw
+                pose_check_results['hydrophobic'] = hydrophobic
+            except Exception as e:
+                pass
+
+        for k, v in pose_check_results.items():
+            mol.SetProp(k, str(v))
+
+        return pose_check_results
+    
+    def evaluate(self):
+        mol = Chem.SDMolSupplier(self.ligand_fn, removeHs=False)[0]
+       
+        chem_results = self.vina_dock(mol)
+        pose_check_results = self.pose_check(mol)
+        chem_results.update(pose_check_results)
+
+        return chem_results
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
+if __name__ == '__main__':
+    protein_path = sys.argv[1]
+    ligand_path = sys.argv[2]
+
+    call(protein_path, ligand_path)
+    out_fn = 'output/0.sdf'
+    metrics = Metrics(protein_path, ligand_path, out_fn).evaluate()
+    print(json.dumps(metrics, indent=4, cls=NpEncoder))
