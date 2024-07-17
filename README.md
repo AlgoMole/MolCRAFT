@@ -1,6 +1,8 @@
 # MolCRAFT
 Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
+🎉 Our demo is now available at [http://gensi-thuair.com:10990](http://gensi-thuair.com:10990). Welcome to have a try!
+
 ## Environment
 It is highly recommended to install via docker if a Linux server with NVIDIA GPU is available.
 
