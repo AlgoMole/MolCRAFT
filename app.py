@@ -53,12 +53,14 @@ reps = [
     {
       "model": 0,
       "style": "cartoon",
-      "color": "whiteCarbon",
+      "color": "cyanCarbon",
+      # "color": "Chain",
     },
     {
       "model": 1,
       "style": "stick",
-      "color": "redCarbon",
+      # "color": "redCarbon",
+      "color": "PyMol",
       "residue_range": "",
     },
     # {
@@ -106,7 +108,7 @@ with gr.Blocks(
     gr.Markdown("# MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space [ICML 2024]")
     with gr.Row():
         dropdown = gr.Dropdown(label="Option 1: choose a pdb from CrossDocked test set:", choices=pdb_files, value=np.random.choice(pdb_files))
-        upload = gr.UploadButton("Option 2: upload a pdb (protein) AND an sdf (ligand)", file_count="multiple")
+        upload = gr.UploadButton("Option 2: upload two files that form an aligned complex (a protein pdb & a ligand sdf to clip the pocket)", file_count="multiple")
   
     # out_ligand = Molecule3D(label='reference molecule', reps=reps)
 
@@ -145,6 +147,8 @@ with gr.Blocks(
 ```
 """
     )
+
+    gr.Markdown("<a href='https://clustrmaps.com/site/1c0i3'  title='Visit tracker'><center><img src='//clustrmaps.com/map_v2.png?cl=ffffff&w=a&t=tt&d=TuKguAwDVF-AYoVCxeGN0dyAr5mp9qWMBD20OvyLtCc' width='30%'/></center></a>")
     
 if __name__ == '__main__':
     demo.launch(server_name="0.0.0.0", server_port=10990, favicon_path="favicon.png")
