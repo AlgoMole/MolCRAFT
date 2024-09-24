@@ -30,7 +30,7 @@ from core.evaluation.utils import eval_bond_length, scoring_func, similarity, ev
 from functools import cached_property 
 import json
 from collections import Counter
-from pose_check_train_set import CDTrainSet
+# from pose_check_train_set import CDTrainSet
 from core.utils.misc import DisjointSet
 
 
