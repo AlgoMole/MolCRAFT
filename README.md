@@ -1,7 +1,7 @@
 # MolCRAFT
 Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space"](https://arxiv.org/abs/2404.12141).
 
-🎉 Our demo is now available at [120.240.170.153:10990](120.240.170.153:10990). The formal version will be at [http://gensi-thuair.com:10990/](http://gensi-thuair.com:10990/) soon. Welcome to have a try!
+🎉 Our demo is now available [here](http://61.241.63.126:8000). Welcome to have a try!
 
 ## Environment
 It is highly recommended to install via docker if a Linux server with NVIDIA GPU is available.
@@ -26,7 +26,7 @@ make
 
 -----
 ## Data
-Data used for training / evaluating the model should be put in the `data` folder by default, and accessible in the [data](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link) Google Drive folder.
+We use the same data as [TargetDiff](https://github.com/guanjq/targetdiff/tree/main?tab=readme-ov-file#data). Data used for training / evaluating the model should be put in the `data` folder by default, and accessible in the [data](https://drive.google.com/drive/folders/1j21cc7-97TedKh_El5E34yI8o5ckI7eK?usp=share_link) Google Drive folder.
 
 To train the model from scratch, download the lmdb file and split file into data folder:
 * `crossdocked_v1.1_rmsd1.0_pocket10_processed_final.lmdb`
@@ -66,7 +66,8 @@ python train_bfn.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
-We provide the pretrained checkpoint as [last.ckpt](https://drive.google.com/file/d/1a1laBFYRNqaMpcS3Id0L0R6XoLEk4gDG/view?usp=share_link). 
+We provide the pretrained checkpoint [here](https://drive.google.com/file/d/1TcUQM7Lw1klH2wOVBu20cTsvBTcC1WKu/view?usp=share_link). 
+
 
 ### Sampling for pockets in the testset
 Run `make evaluate -f scripts.mk`, or alternatively,
