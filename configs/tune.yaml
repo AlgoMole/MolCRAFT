@@ -15,6 +15,7 @@ dynamics:
   t_min: !SUB ${t_min}
   sigma1_coord: !SUB ${sigma1_coord}
   beta1: !SUB ${beta1}
+  beta1_bond: !SUB ${beta1_bond}
   protein_atom_feature_dim: 27 #TODO
   ligand_atom_feature_dim: 13
   use_discrete_t: !SUB ${use_discrete_t}
@@ -29,25 +30,31 @@ dynamics:
   time_emb_mode: !SUB ${time_emb_mode}
   center_pos_mode: protein
   pos_init_mode: !SUB ${pos_init_mode}
+  bond_net_type: !SUB ${bond_net_type}
   net_config:
-      name: "unio2net"
+      # bond
+      name: "unio2net_bond"
+      num_bond_classes: 5
+      h_node_in_bond_net: True
+      # remaining
       num_blocks: 1
-      num_layers: 9
-      hidden_dim: 128
+      num_layers: !SUB ${num_layers}
+      hidden_dim: !SUB ${hidden_dim}
       n_heads: 16
       edge_feat_dim: 4  # edge type feat
       num_r_gaussian: 20
       knn: 32 # !
-      num_node_types: 8
+      # num_node_types: 8
       act_fn: relu
       norm: True
       cutoff_mode: knn  # [radius, none]
-      ew_net_type: global  # [r, m, none]
-      num_x2h: 1
-      num_h2x: 1
+      # ew_net_type: global  # [r, m, none]
+      # num_x2h: 1
+      # num_h2x: 1
       r_max: 10.
       x2h_out_fc: False
       sync_twoup: False
+      dropout: 0.1
 
 
 accounting:
@@ -65,7 +72,7 @@ data:
   path: ./data/crossdocked_v1.1_rmsd1.0_pocket10
   split:  ./data/crossdocked_pocket10_pose_split.pt
   transform:
-    ligand_atom_mode: add_aromatic
+    ligand_atom_mode: basic
   with_split: True
   atom_decoder: ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl']
   colors_dic: ['#FFFFFF99', 'C7', 'C0', 'C3', 'C1', 'C4', 'C8', 'C9', ]
@@ -107,8 +114,8 @@ train:
 
 
 evaluation:
-  ckpt_path: !SUB ${ckpt_path}
-  batch_size: 100
+  ckpt_path: ./checkpoint/tune10.ckpt
+  batch_size: 50
   sample_steps: !SUB ${sample_steps}
   num_samples: !SUB ${num_samples}  # x-% test
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']

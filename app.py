@@ -5,14 +5,22 @@ from gradio_molecule3d import Molecule3D
 
 import os
 import shutil
+import argparse
 
+input_dir = f'./input'
+config_path = 'checkpoints/bond10.yaml'
+port = 10990
+
+# config_path = 'checkpoints/config.yaml'
+# port = 10970
+
+# config_path = 'checkpoints/tune10.yaml'
+# port = 10950
 
 def copy_file_from_tmp_to_input(tmp_file_path):
-    if not os.path.exists('./input'):
-      os.makedirs('./input', exist_ok=True)
-    if not os.path.exists('./output'):
-      os.makedirs('./output', exist_ok=True)
-    dst = os.path.join('./input', os.path.basename(tmp_file_path))
+    if not os.path.exists(input_dir):
+      os.makedirs(input_dir, exist_ok=True)
+    dst = os.path.join(input_dir, os.path.basename(tmp_file_path))
     shutil.copyfile(tmp_file_path, dst)
     return dst
 
@@ -21,7 +29,7 @@ def load(dropdown_value: str, upload_value: list):
     sdf_path = glob.glob(pdb_path.rstrip('.pdb') + '*.sdf')
     # print(sdf_path)
     assert len(sdf_path) == 1
-    sdf_path = sdf_path[0]
+    sdf_path = sdf_path[-1]
 
     if upload_value is not None and type(upload_value) == list and len(upload_value) == 2:
       flag = False
@@ -78,7 +86,7 @@ import json
 
 def generate(dropdown_value: str, upload_value: list):
     protein_path, ligand_path = load(dropdown_value, upload_value)
-    call(protein_path, ligand_path)
+    call(protein_path, ligand_path, config_path)
     
     out_fns = sorted(glob.glob(f'{OUT_DIR}/*.sdf'))
     return gr.update(choices=out_fns, value=out_fns[0])
@@ -102,7 +110,7 @@ def evaluate(dropdown_value: str, upload_value: list, out_fn: str):
 
 
 with gr.Blocks(
-      title='MolCRAFT',
+      title='MolBond',
       css=".gradio-container, .gradio-container button {} footer {visibility: hidden}"
     ) as demo:
     gr.Markdown("# MolCRAFT: Structure-Based Drug Design in Continuous Parameter Space [ICML 2024]")
@@ -151,4 +159,4 @@ with gr.Blocks(
     gr.Markdown("<a href='https://clustrmaps.com/site/1c0i3'  title='Visit tracker'><center><img src='//clustrmaps.com/map_v2.png?cl=ffffff&w=a&t=tt&d=TuKguAwDVF-AYoVCxeGN0dyAr5mp9qWMBD20OvyLtCc' width='30%'/></center></a>")
     
 if __name__ == '__main__':
-    demo.launch(server_name="0.0.0.0", server_port=10990, favicon_path="favicon.png")
+    demo.launch(server_name="0.0.0.0", server_port=port, favicon_path="favicon.png")

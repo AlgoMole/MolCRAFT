@@ -23,7 +23,7 @@ from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
 from core.evaluation.visualization import visualize, visualize_chain
 from core.utils import transforms as trans
 from core.evaluation.utils import timing
-from core.utils.reconstruct import reconstruct_from_generated, MolReconError
+from core.utils.reconstruct import reconstruct_from_generated, MolReconsError
 
 # this file contains the model which we used to visualize the
 
@@ -53,16 +53,15 @@ def reconstruct_mol_and_filter_invalid(out_list):
     center_change_list, mol_pos_range_list = [], []
 
     for item in out_list:
-        ligand_filename, pos, atom_type, is_aromatic = item.ligand_filename, item.pos, item.atom_type, item.is_aromatic
+        ligand_filename, pos, atom_type = item.ligand_filename, item.pos, item.atom_type
         protein_pos, protein_v = item.protein_pos, item.protein_atom_feature
         
         pos = pos.cpu().numpy().astype('float64')
         atom_type = atom_type.cpu().numpy().astype('int32')
-        is_aromatic = is_aromatic.cpu().numpy().astype('bool')
         protein_pos = protein_pos.cpu().numpy().astype('float64')
         # TODO turn off basic_mode = False to use predicted aromaticity
         try:
-            mol = reconstruct_from_generated(pos, atom_type, is_aromatic, basic_mode=True)
+            mol = item.mol
             n_recon += 1
 
             mol_center = pos.mean(axis=0)
@@ -72,7 +71,7 @@ def reconstruct_mol_and_filter_invalid(out_list):
 
             res = {
                 'mol': mol, 'ligand_filename': ligand_filename, 
-                'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
+                'pred_pos': pos, 'pred_v': atom_type, 
                 'protein_center': protein_center, 'mol_center': mol_center,
                 'center_change': center_change, 'mol_pos_range': mol_pos_range,
             }

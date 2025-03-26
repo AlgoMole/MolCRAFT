@@ -95,24 +95,19 @@ def get_dataloader_from_pdb(cfg):
     return test_loader
 
 
-def call(protein_fn, ligand_fn, ckpt_path='./checkpoints/last.ckpt',
-         num_samples=10, sample_steps=100, sample_num_atoms='prior', 
-         beta1=1.5, sigma1_coord=0.03, sampling_strategy='end_back', seed=1234):
+def call(protein_fn, ligand_fn, config_path='./checkpoints/config.yaml',
+         num_samples=10, sample_steps=100, sample_num_atoms='prior', seed=1234):
     
-    cfg = Config('./checkpoints/config.yaml')
+    cfg = Config(config_path)
     seed_everything(cfg.seed)
     
     cfg.evaluation.protein_path = protein_fn
     cfg.evaluation.ligand_path = ligand_fn
-    cfg.evaluation.ckpt_path = ckpt_path
     cfg.test_only = True
     cfg.no_wandb = True
     cfg.evaluation.num_samples = num_samples
     cfg.evaluation.sample_steps = sample_steps
     cfg.evaluation.sample_num_atoms = sample_num_atoms # or 'prior'
-    cfg.dynamics.beta1 = beta1
-    cfg.dynamics.sigma1_coord = sigma1_coord
-    cfg.dynamics.sampling_strategy = sampling_strategy
     cfg.seed = seed
     cfg.train.max_grad_norm = 'Q'
 
@@ -185,11 +180,11 @@ class Metrics:
         pose_check_results = {}
 
         protein_ready = False
-        try:
-            pc.load_protein_from_pdb(self.protein_fn)
-            protein_ready = True
-        except ValueError as e:
-            return pose_check_results
+        # try:
+        #     pc.load_protein_from_pdb(self.protein_fn)
+        #     protein_ready = True
+        # except ValueError as e:
+        #     return pose_check_results
 
         ligand_ready = False
         try:
@@ -267,6 +262,6 @@ if __name__ == '__main__':
     ligand_path = sys.argv[2]
 
     call(protein_path, ligand_path)
-    out_fn = 'output/0.sdf'
+    out_fn = os.path.join(OUT_DIR, '0.sdf')
     metrics = Metrics(protein_path, ligand_path, out_fn).evaluate()
     print(json.dumps(metrics, indent=4, cls=NpEncoder))

@@ -396,10 +396,10 @@ if __name__ == '__main__':
     # for i in tqdm(range(len(dataset))):
     #     data = dataset[i]
     #     element_list = data.ligand_element
-    #     hybridization_list = data.ligand_hybridization
+    #     charge_list = data.ligand_charge
     #     aromatic_list = [v[trans.AROMATIC_FEAT_MAP_IDX] for v in data.ligand_atom_feature]
 
-    #     types = [(e, a) for e, h, a in zip(element_list, hybridization_list, aromatic_list)]
+    #     types = [(e, a) for e, h, a in zip(element_list, charge_list, aromatic_list)]
     #     for t in types:
     #         t = (t[0].item(), bool(t[1].item()))
     #         if t not in atom_types:
@@ -417,7 +417,7 @@ if __name__ == '__main__':
     # type_counter, aromatic_counter, full_counter = {}, {}, {}
     # for i, data in enumerate(tqdm(dataset)):
     #     element_list = data.ligand_element
-    #     hybridization_list = data.ligand_hybridization
+    #     charge_list = data.ligand_charge
     #     aromatic_list = [v[trans.AROMATIC_FEAT_MAP_IDX] for v in data.ligand_atom_feature]
     #     flag = False
 
@@ -438,7 +438,7 @@ if __name__ == '__main__':
     #         if key not in trans.MAP_ATOM_TYPE_AROMATIC_TO_INDEX:
     #             flag = True
 
-    #     for e, h, a in zip(element_list, hybridization_list, aromatic_list):
+    #     for e, h, a in zip(element_list, charge_list, aromatic_list):
     #         e = int(e.item())
     #         a = bool(a.item())
     #         key = (e, h, a)

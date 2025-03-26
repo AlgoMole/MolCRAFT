@@ -147,4 +147,6 @@ docker/*.sh
 logs/
 pt_results
 input/
-output/
+output*/
+ssh/
+gitconfig

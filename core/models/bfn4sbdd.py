@@ -8,10 +8,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from core.config.config import Struct
-from core.models.common import compose_context, ShiftedSoftplus
+from core.models.common import compose_context, ShiftedSoftplus, GaussianSmearing
 from core.models.bfn_base import BFNBase
 from core.models.uni_transformer import UniTransformerO2TwoUpdateGeneral
-
+from core.models.uni_transformer_edge import UniTransformerO2TwoUpdateGeneralBond
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
@@ -88,6 +88,8 @@ class BFN4SBDDScoreModel(BFNBase):
         condition_time=True,
         sigma1_coord=0.02,
         beta1=3.0,
+        beta1_bond=None,
+        bond_net_type=None,
         use_discrete_t=False,
         discrete_steps=1000,
         t_min=0.0001,
@@ -108,16 +110,37 @@ class BFN4SBDDScoreModel(BFNBase):
         #     out_node_nf = in_node_nf + 1
         net_config = Struct(**net_config)
         self.config = net_config
-
-        if net_config.name == 'unio2net':
-            self.unio2net = UniTransformerO2TwoUpdateGeneral(**net_config.todict())
-        else:
-            raise NotImplementedError
         
         self.hidden_dim = net_config.hidden_dim
         self.num_classes = ligand_atom_feature_dim
-
         self.node_indicator = node_indicator
+
+        if net_config.name == 'unio2net':
+            self.unio2net = UniTransformerO2TwoUpdateGeneral(**net_config.todict())
+            self.bond_bfn = False
+        elif net_config.name == 'unio2net_bond':
+            self.unio2net = UniTransformerO2TwoUpdateGeneralBond(**net_config.todict())
+            self.num_bond_classes = self.config.num_bond_classes
+            self.ligand_bond_emb = nn.Linear(self.num_bond_classes, self.hidden_dim)
+            self.bond_bfn = True
+            # include bond
+            self.bond_net_type = bond_net_type
+            self.distance_expansion = GaussianSmearing(0., 5., num_gaussians=self.config.num_r_gaussian, fix_offset=False)
+            if self.bond_net_type == 'pre_att':
+                bond_input_dim = self.config.num_r_gaussian + self.hidden_dim
+            elif self.bond_net_type == 'flowmol':
+                bond_input_dim = self.config.num_r_gaussian + 2 * self.ligand_atom_feature_dim
+            elif self.bond_net_type == 'lin':
+                bond_input_dim = self.hidden_dim
+            else:
+                raise ValueError(self.bond_net_type)
+            self.bond_inference = nn.Sequential(
+                nn.Linear(bond_input_dim, self.hidden_dim),
+                ShiftedSoftplus(),
+                nn.Linear(self.hidden_dim, self.num_bond_classes)
+            )            
+        else:
+            raise NotImplementedError
 
         if self.node_indicator:
             emb_dim = self.hidden_dim - 1
@@ -129,9 +152,12 @@ class BFN4SBDDScoreModel(BFNBase):
         self.center_pos_mode = center_pos_mode  # ['none', 'protein']
 
         self.time_emb_mode = time_emb_mode
-        self.time_emb_dim = time_emb_dim
-        if self.time_emb_dim > 0:
-            self.time_emb_layer = TimeEmbedLayer(self.time_emb_mode, self.time_emb_dim)
+        if net_config.name == 'unio2net_bond':
+            self.time_emb_dim = 0
+        else:
+            self.time_emb_dim = time_emb_dim
+            if self.time_emb_dim > 0:
+                self.time_emb_layer = TimeEmbedLayer(self.time_emb_mode, self.time_emb_dim)
         self.ligand_atom_emb = nn.Linear(
             ligand_atom_feature_dim + self.time_emb_dim, emb_dim
         )
@@ -148,6 +174,10 @@ class BFN4SBDDScoreModel(BFNBase):
         self.condition_time = condition_time
         self.sigma1_coord = torch.tensor(sigma1_coord, dtype=torch.float32)  # coordinate sigma1, a schedule for bfn
         self.beta1 = torch.tensor(beta1, dtype=torch.float32)  # type beta, a schedule for types.
+        
+        if beta1_bond is not None:
+            self.beta1_bond = torch.tensor(beta1_bond, dtype=torch.float32)  # bond beta, a schedule for bond types.
+ 
         self.use_discrete_t = use_discrete_t  # whether to use discrete t
         self.discrete_steps = discrete_steps
         self.t_min = t_min
@@ -163,10 +193,14 @@ class BFN4SBDDScoreModel(BFNBase):
         batch_protein,  # index for protein
         theta_h_t,
         mu_pos_t,
+        theta_bond_t,  # add bond
+        ligand_bond_index,  # index for bond
         batch_ligand,  # index for ligand
+        batch_ligand_bond, # index for bond
         gamma_coord,
         return_all=False,  # legacy from targetdiff
         fix_x=False,
+        ligand_atom_mask=None,
     ):
         """
         Compute output distribution parameters for p_O (x' | θ; t) (x_hat or k^(d) logits).
@@ -184,8 +218,11 @@ class BFN4SBDDScoreModel(BFNBase):
             gamma_coord: [node_num x batch_size, 1] := [N_ligand, 1]
         """
         K = self.num_classes  # ligand_atom_feature_dim
-
         theta_h_t = 2 * theta_h_t - 1  # from 1/K \in [0,1] to 2/K-1 \in [-1,1]
+        
+        if self.bond_bfn:
+            E = self.num_bond_classes  # bond_atom_feature_dim
+            theta_bond_t = 2 * theta_bond_t - 1  # from 1/K \in [0,1] to 2/K-1 \in [-1,1]
 
         # ---------for targetdiff-----------
         batch_size = batch_protein.max().item() + 1
@@ -210,22 +247,52 @@ class BFN4SBDDScoreModel(BFNBase):
                 [init_ligand_h, torch.ones(len(init_ligand_h), 1).to(h_protein)], -1
             )  # [N_ligand, self.hidden_dim]
 
-        h_all, pos_all, batch_all, mask_ligand = compose_context(
+        h_all, pos_all, batch_all, mask_ligand, mask_ligand_atom, p_index_in_ctx, l_index_in_ctx = compose_context(
             h_protein=h_protein,
             h_ligand=init_ligand_h,
             pos_protein=protein_pos,
             pos_ligand=mu_pos_t,
             batch_protein=batch_protein,
             batch_ligand=batch_ligand,
+            ligand_atom_mask=ligand_atom_mask,
         )
         # get the context for the protein and ligand, while the ligand is h is noisy (h_t)/ pos is also the noise version. (pos_t)
 
         # ---------------------
 
         # time = 2 * time - 1
-        outputs = self.unio2net(
-            h_all, pos_all, mask_ligand, batch_all, return_all=return_all, fix_x=fix_x
-        )
+        if ligand_bond_index is not None:
+            if protein_pos is not None:
+                bond_index_in_all = l_index_in_ctx[ligand_bond_index]
+            else:
+                bond_index_in_all = ligand_bond_index
+        else:
+            bond_index_in_all = None
+
+        # time = 2 * time - 1
+        node_time = time[batch_all].squeeze(-1)
+        if self.bond_bfn:
+            bond_time = time[batch_ligand_bond].squeeze(-1)
+            # bond_type = F.one_hot(theta_bond_t, num_classes=self.num_bond_classes).float()
+            bond_type = theta_bond_t
+            h_bond = self.ligand_bond_emb(bond_type)
+            outputs = self.unio2net(
+                h=h_all, x=pos_all, group_idx=None,
+                bond_index=bond_index_in_all, h_bond=h_bond,
+                mask_ligand=mask_ligand,
+                # mask_ligand_atom=mask_ligand_atom,  # dummy node is marked as 0
+                batch=batch_all,
+                node_time=node_time,
+                bond_time=bond_time,
+                include_protein=True,
+                return_all=return_all,
+            )
+
+        else:
+            outputs = self.unio2net(
+                h_all, pos_all, mask_ligand, batch_all, fix_x=fix_x, return_all=return_all
+            )
+
         final_pos, final_h = (
             outputs["x"],
             outputs["h"],
@@ -254,6 +321,25 @@ class BFN4SBDDScoreModel(BFNBase):
 
         k_hat = torch.zeros_like(mu_pos_t)  # TODO: here we close the
 
+        # bond inference input
+        if self.bond_bfn:
+            if self.bond_net_type != 'lin':
+                src, dst = bond_index_in_all
+                dist = torch.norm(final_pos[dst] - final_pos[src], p=2, dim=-1, keepdim=True)
+                r_feat = self.distance_expansion(dist)
+                if self.bond_net_type == 'pre_att':
+                    hi, hj = final_h[dst], final_h[src]
+                    bond_inf_input = torch.cat([r_feat, (hi + hj) / 2], -1)
+                elif self.bond_net_type == 'flowmol':
+                    src, dst = ligand_bond_index
+                    vi, vj = final_ligand_v[src], final_ligand_v[dst]
+                    bond_inf_input = torch.cat([r_feat, vi, vj], -1)
+            elif self.bond_net_type == 'lin':
+                bond_inf_input = outputs['h_bond']
+            else:
+                raise ValueError(self.bond_net_type)
+            final_ligand_e = self.bond_inference(bond_inf_input)
+
         # if self.condition_time:
         #     # Slice off last dimension which represented time.
         #     h_final = h_final[:, :-1]
@@ -266,6 +352,17 @@ class BFN4SBDDScoreModel(BFNBase):
             p0_h = torch.cat((p0_1, p0_2), dim=-1)  #
         else:
             p0_h = torch.nn.functional.softmax(final_ligand_v, dim=-1)  # [N_ligand, 13]
+
+        if self.bond_bfn:
+            if E == 2:
+                pE_1 = torch.sigmoid(final_ligand_e)
+                pE_2 = 1 - pE_1
+                pE_h = torch.cat((pE_1, pE_2), dim=-1)
+            else:
+                pE_h = torch.nn.functional.softmax(final_ligand_e, dim=-1)
+        else:
+            pE_h = None
+
         """
         for discretised variable, we return p_o
         """
@@ -288,7 +385,16 @@ class BFN4SBDDScoreModel(BFNBase):
 
         # TODO: here the preds are reformated.
         # print(coord_pred.shape, p0_h.shape, k_hat.shape)
-        return coord_pred, p0_h, k_hat
+
+        preds = {
+            'pred_ligand_pos': coord_pred,
+            'pred_ligand_v': p0_h,
+            'pred_ligand_charge': k_hat,
+            'pred_ligand_bond': pE_h,
+            'final_h': final_h,
+            'final_ligand_h': final_ligand_h
+        }
+        return preds
 
     def reconstruction_loss_one_step(
         self,
@@ -298,11 +404,23 @@ class BFN4SBDDScoreModel(BFNBase):
         batch_protein,
         ligand_pos,
         ligand_v,
+        ligand_bond_type,
+        ligand_bond_index,
         batch_ligand,
+        batch_ligand_bond,
     ):
         # TODO: implement reconstruction loss (but do we really need it?)
         return self.loss_one_step(
-            t, protein_pos, protein_v, batch_protein, ligand_pos, ligand_v, batch_ligand
+            t=t,
+            protein_pos=protein_pos,
+            protein_v=protein_v,
+            batch_protein=batch_protein,
+            ligand_pos=ligand_pos,
+            ligand_v=ligand_v,
+            ligand_bond_type=ligand_bond_type,
+            ligand_bond_index=ligand_bond_index,
+            batch_ligand=batch_ligand,
+            batch_ligand_bond=batch_ligand_bond,
         )
 
     def loss_one_step(
@@ -313,49 +431,61 @@ class BFN4SBDDScoreModel(BFNBase):
         batch_protein,
         ligand_pos,
         ligand_v,
+        ligand_bond_type,
+        ligand_bond_index,
         batch_ligand,
+        batch_ligand_bond,
     ):
         K = self.num_classes
-
-        # if self.include_charge:
-        #     assert x.size(-1) == K + 1
-        #     charges = x[:, -1:]
-        #     x = x[:, :-1]
-        #     mu_charge, gamma_charge = self.discreteised_var_bayesian_update(t, sigma1=self.sigma1_charges, x=charges)
-        # else:
-        #     mu_charge = None
-        #     gamma_charge = None
-        #     #pos = torch.cat([pos, charges], dim=-1)
-
-        # print("loss",charges)
-        # TODO: no charge here
         assert ligand_v.max().item() < K, f"Error: {ligand_v.max().item()} >= {K}"
         ligand_v = F.one_hot(ligand_v, K).float()  # [N, K]
 
+        if self.bond_bfn:
+            E = self.num_bond_classes
+            assert ligand_bond_type.max().item() < E, f"Error: {ligand_bond_type.max().item()} >= {E}"
+            ligand_bond_type = F.one_hot(ligand_bond_type, E).float()  # [Nb, E]
+ 
         # 1. Bayesian Flow p_F(θ|x;t), obtain input parameters θ
         # continuous ~ N(μ | γ(t)x, γ(t)(1 − γ(t))I)
         mu_coord, gamma_coord = self.continuous_var_bayesian_update(
-            t, sigma1=self.sigma1_coord, x=ligand_pos
+            t[batch_ligand], sigma1=self.sigma1_coord, x=ligand_pos
         )  # [N, 3], [N, 1]
 
         # discrete ~ N(y | β(t)(Ke_x−1), β(t)KI)
         theta = self.discrete_var_bayesian_update(
-            t, beta1=self.beta1, x=ligand_v, K=K
+            t[batch_ligand], beta1=self.beta1, x=ligand_v, K=K
         )  # [N, K]
+
+        if self.bond_bfn:
+            theta_bond = self.discrete_var_bayesian_update(
+                t[batch_ligand_bond], beta1=self.beta1_bond, x=ligand_bond_type, K=E
+            )  # [Nb, E]
+        else:
+            theta_bond = None
+            batch_ligand_bond = None
 
         # 2. Compute output distribution parameters for p_O (x' | θ; t) (x_hat or k^(d) logits)
         # continuous x ~ δ(x − x_hat(θ, t))
         # discrete k^(d) ~ softmax(Ψ^(d)(θ, t))_k
-        coord_pred, p0_h, k_hat = self.interdependency_modeling(
-            time=t,
+        preds = self.interdependency_modeling(
+            time=t[batch_ligand],
             protein_pos=protein_pos,
             protein_v=protein_v,
             batch_protein=batch_protein,
             theta_h_t=theta,
+            theta_bond_t=theta_bond,
+            ligand_bond_index=ligand_bond_index,
             mu_pos_t=mu_coord,
             batch_ligand=batch_ligand,
+            batch_ligand_bond=batch_ligand_bond,
             gamma_coord=gamma_coord,
         )  # [N, 3], [N, K], [?]
+        coord_pred, p0_h, k_hat = ( 
+            preds['pred_ligand_pos'], preds['pred_ligand_v'], preds['pred_ligand_charge']
+        )
+
+        if self.bond_bfn:
+            bond_pred = preds['pred_ligand_bond']
         # if self.include_charge:
         #     k_c = torch.tensor(self.k_c).to(self.device).unsqueeze(-1).unsqueeze(0)
         #     k_hat = (k_hat * k_c).sum(dim=1)
@@ -365,24 +495,27 @@ class BFN4SBDDScoreModel(BFNBase):
         # 3. Compute reweighted loss (previous [N,] now [B,])
         if not self.use_discrete_t:
             closs = self.ctime4continuous_loss(
-                t=t,
+                t=t[batch_ligand],
                 sigma1=self.sigma1_coord,
                 x_pred=coord_pred,
                 x=ligand_pos,
                 segment_ids=batch_ligand,
             )  # [B,]
             dloss = self.ctime4discrete_loss(
-                t=t,
+                t=t[batch_ligand],
                 beta1=self.beta1,
-                one_hot_x=ligand_v,
+                one_hot_x=ligand_type,
                 p_0=p0_h,
                 K=K,
                 segment_ids=batch_ligand,
             )  # [B,]
+
+            # TODO: add bond loss
+            raise NotImplementedError
         else:
             i = (t * self.discrete_steps).int() + 1  # discrete interval [1,N]
             closs = self.dtime4continuous_loss(
-                i=i,
+                i=i[batch_ligand],
                 N=self.discrete_steps,
                 sigma1=self.sigma1_coord,
                 x_pred=coord_pred,
@@ -398,7 +531,7 @@ class BFN4SBDDScoreModel(BFNBase):
             # )  # [B,]
 
             dloss = self.dtime4discrete_loss_prob(
-                i=i,
+                i=i[batch_ligand],
                 N=self.discrete_steps,
                 beta1=self.beta1,
                 one_hot_x=ligand_v,
@@ -406,6 +539,19 @@ class BFN4SBDDScoreModel(BFNBase):
                 K=K,
                 segment_ids=batch_ligand,
             )
+
+            if self.bond_bfn:
+                dloss_bond = self.dtime4discrete_loss_prob(
+                    i=i[batch_ligand_bond],
+                    N=self.discrete_steps,
+                    beta1=self.beta1_bond,
+                    one_hot_x=ligand_bond_type,
+                    p_0=bond_pred,
+                    K=self.num_bond_classes,
+                    segment_ids=batch_ligand_bond,
+                )
+            else:
+                dloss_bond = torch.zeros_like(dloss)
 
             # mixed loss
             # dloss = self.ctime4discrete_loss(
@@ -434,7 +580,14 @@ class BFN4SBDDScoreModel(BFNBase):
         # else:
         discretized_loss = torch.zeros_like(closs)
 
-        return closs, dloss, discretized_loss
+        losses = {
+            'closs': closs,
+            'dloss': dloss,
+            'dloss_bond': dloss_bond,
+            'discretized_loss': discretized_loss
+        }
+
+        return losses
 
     def sample(
         self,
@@ -442,10 +595,14 @@ class BFN4SBDDScoreModel(BFNBase):
         protein_v,
         batch_protein,
         batch_ligand,
+        batch_ligand_bond,
+        ligand_bond_index, 
         n_nodes,  # B
         sample_steps=1000,
-        desc='',
+        desc='Val',
         ligand_pos=None,  # for debug
+        ligand_v=None,  # for docking
+        ligand_bond_type=None,  # for docking
     ):
         """
         The function implements a sampling procedure for BFN
@@ -460,6 +617,10 @@ class BFN4SBDDScoreModel(BFNBase):
         # for continuous, θ_0 = N(0, I)
         # for discrete, θ_0 = 1/K ∈ [0,1]**(KD)
         K = self.num_classes
+        if self.bond_bfn:
+            E = self.num_bond_classes
+        else:
+            ligand_bond_type = None
 
         # TODO: no charges here
         # if self.include_charge:
@@ -488,6 +649,11 @@ class BFN4SBDDScoreModel(BFNBase):
         )  # [N, K] discrete prior (uniform 1/K)
         ro_coord = 1
         ro_charge = 1
+        
+        if self.bond_bfn:
+            theta_bond_t = torch.ones((n_nodes, E)).to(self.device) / E
+        else:
+            theta_bond_t = None
 
         sample_traj = []
         theta_traj = []
@@ -496,12 +662,12 @@ class BFN4SBDDScoreModel(BFNBase):
         # TODO: debug
         mu_pos_t = mu_pos_t[batch_ligand]
         theta_h_t = theta_h_t[batch_ligand]
+        if self.bond_bfn: theta_bond_t = theta_bond_t[batch_ligand_bond]
         for i in trange(1, sample_steps + 1, desc=f'{desc}'):
             t = torch.ones((n_nodes, 1)).to(self.device) * (i - 1) / sample_steps
             if not self.use_discrete_t and not self.destination_prediction:
                 t = torch.clamp(t, min=self.t_min)
 
-            t = t[batch_ligand]
             # Eq.(84): γ(t) = σ1^(2t)
             gamma_coord = 1 - torch.pow(self.sigma1_coord, 2 * t)
             # gamma_charge = 1 - torch.pow(self.sigma1_charges, 2 * t)
@@ -514,12 +680,13 @@ class BFN4SBDDScoreModel(BFNBase):
             # debug only
             # mu_coord_gt, gamma_coord_gt = self.continuous_var_bayesian_update(t, sigma1=self.sigma1_coord, x=ligand_pos)
 
-            coord_pred, p0_h_pred, k_hat = self.interdependency_modeling(
-                time=t,
+            preds = self.interdependency_modeling(
+                time=t[batch_ligand],
                 protein_pos=protein_pos,
                 protein_v=protein_v,
                 batch_protein=batch_protein,
                 batch_ligand=batch_ligand,
+                batch_ligand_bond=batch_ligand_bond,
                 theta_h_t=theta_h_t,
                 # mu_pos_t=mu_coord_gt,  # fix mu pos guidance, type decoding
                 # mu_pos_t=mu_pos_t if i > sample_steps/10 else mu_coord_gt,  # early guidance
@@ -528,7 +695,16 @@ class BFN4SBDDScoreModel(BFNBase):
                 # TODO: add charge
                 # mu_charge_t=mu_charge_t,
                 # gamma_charge=gamma_charge,
+                theta_bond_t=theta_bond_t,
+                ligand_bond_index=ligand_bond_index,
             )
+            coord_pred, p0_h_pred, k_hat, pE_h_pred = (
+                preds['pred_ligand_pos'],
+                preds['pred_ligand_v'],
+                preds['pred_ligand_charge'],
+                preds['pred_ligand_bond'],
+            )
+
 
             # debug only
             # if i % (sample_steps // 10) == 0:
@@ -540,7 +716,7 @@ class BFN4SBDDScoreModel(BFNBase):
             #     print("coord_pred", coord_pred)
 
             # maintain theta_traj
-            theta_traj.append((mu_pos_t, theta_h_t, k_hat))
+            theta_traj.append((mu_pos_t, theta_h_t, k_hat, pE_h_pred))
             # TODO delete the following condition
             if not torch.all(p0_h_pred.isfinite()):
                 p0_h_pred = torch.where(
@@ -551,6 +727,18 @@ class BFN4SBDDScoreModel(BFNBase):
             p0_h_pred = torch.clamp(p0_h_pred, min=1e-6)
             sample_pred = torch.distributions.Categorical(p0_h_pred).sample()
             sample_pred = F.one_hot(sample_pred, num_classes=K)
+            if self.bond_bfn:
+                if not torch.all(pE_h_pred.isfinite()):
+                    pE_h_pred = torch.where(
+                        pE_h_pred.isfinite(), pE_h_pred, torch.zeros_like(pE_h_pred)
+                    )
+                    logging.warn("pE_h_pred is not finite")
+                
+                pE_h_pred = torch.clamp(pE_h_pred, min=1e-6)
+                sample_pred_bond = torch.distributions.Categorical(pE_h_pred).sample()
+                sample_pred_bond = F.one_hot(sample_pred_bond, num_classes=E)
+            else:
+                sample_pred_bond = None
 
             # if self.include_charge:
             #     sample_traj.append((coord_pred[:, :-1], sample_pred))
@@ -581,10 +769,22 @@ class BFN4SBDDScoreModel(BFNBase):
             var = alpha_h * K
             std = torch.full_like(mean, fill_value=var).sqrt()
             y_h = mean + std * torch.randn_like(e_k)
-            y_traj.append((y_coord, y_h, k_hat))
+
+            if self.bond_bfn:
+                alpha_E = self.beta1_bond * (2 * i - 1) / (sample_steps**2)
+                k_bond = torch.distributions.Categorical(probs=pE_h_pred).sample()
+                e_k_bond = F.one_hot(k_bond, num_classes=E).float()
+                mean_bond = alpha_E * (E * e_k_bond - 1)
+                var_bond = alpha_E * E
+                std_bond = torch.full_like(mean_bond, fill_value=var_bond).sqrt()
+                y_bond = mean_bond + std_bond * torch.randn_like(e_k_bond)
+            else:
+                y_bond = None
+
+            y_traj.append((y_coord, y_h, k_hat, y_bond))
 
             if self.sampling_strategy == "vanilla":
-                sample_traj.append((coord_pred, sample_pred, k_hat))
+                sample_traj.append((coord_pred, sample_pred, k_hat, sample_pred_bond))
 
                 # 4. Bayesian update input parameters θ_i = h(θ_{i−1}, y) for p_I(x | θ_i; t_i)
                 # for continuous, Eq.(49): ρi = ρ_{i−1} + α,
@@ -598,21 +798,32 @@ class BFN4SBDDScoreModel(BFNBase):
                 theta_prime = torch.exp(y_h) * theta_h_t  # e^y * θ_{i−1}
                 theta_h_t = theta_prime / theta_prime.sum(dim=-1, keepdim=True)
 
+                if self.bond_bfn:
+                    theta_prime_bond = torch.exp(y_bond) * theta_bond_t
+                    theta_bond_t = theta_prime_bond / theta_prime_bond.sum(dim=-1, keepdim=True)
+
             elif "end_back" in self.sampling_strategy:
                 t = torch.ones((n_nodes, 1)).to(self.device) * i  / sample_steps #next time step
-                t = t[batch_ligand]
                 if self.sampling_strategy == "end_back":
-                    theta_h_t = self.discrete_var_bayesian_update(t, beta1=self.beta1, x=sample_pred, K=K)
+                    theta_h_t = self.discrete_var_bayesian_update(t[batch_ligand], beta1=self.beta1, x=sample_pred, K=K)
+                    if self.bond_bfn: theta_bond_t = self.discrete_var_bayesian_update(t[batch_ligand_bond], beta1=self.beta1_bond, x=sample_pred_bond, K=E)
                 elif self.sampling_strategy == "end_back_pmf":
-                    theta_h_t = self.discrete_var_bayesian_update(t, beta1=self.beta1, x=p0_h_pred, K=K)
+                    theta_h_t = self.discrete_var_bayesian_update(t[batch_ligand], beta1=self.beta1, x=p0_h_pred, K=K)
+                    if self.bond_bfn: theta_bond_t = self.discrete_var_bayesian_update(t[batch_ligand_bond], beta1=self.beta1_bond, x=pE_h_pred, K=E)
                 elif self.sampling_strategy == "end_back_mode":
                     p0_mode = torch.argmax(p0_h_pred, dim=-1)
                     mode_pred = F.one_hot(p0_mode, num_classes=K).float()
-                    theta_h_t = self.discrete_var_bayesian_update(t, beta1=self.beta1, x=mode_pred, K=K)
+                    theta_h_t = self.discrete_var_bayesian_update(t[batch_ligand], beta1=self.beta1, x=mode_pred, K=K)
+                
+                    if self.bond_bfn: 
+                        pE_mode = torch.argmax(pE_h_pred, dim=-1)
+                        mode_pred_bond = F.one_hot(pE_mode, num_classes=E).float()
+                        theta_bond_t = self.discrete_var_bayesian_update(t[batch_ligand_bond], beta1=self.beta1_bond, x=mode_pred_bond, K=E)
+                
                 else:
                     raise NotImplementedError(f"sampling strategy {self.sampling_strategy} not implemented")
-                mu_pos_t = self.continuous_var_bayesian_update(t, sigma1=self.sigma1_coord, x=coord_pred)[0]
-                sample_traj.append((coord_pred, sample_pred, k_hat))
+                mu_pos_t = self.continuous_var_bayesian_update(t[batch_ligand], sigma1=self.sigma1_coord, x=coord_pred)[0]
+                sample_traj.append((coord_pred, sample_pred, k_hat, sample_pred_bond))
 
                 # if i % (sample_steps // 10) == 0:
                     # print(f"theta_h_{i}", theta_h_t)
@@ -688,17 +899,27 @@ class BFN4SBDDScoreModel(BFNBase):
                 # sample_traj.append((coord_pred, sample_pred,k_hat))
 
         # 5. Compute final output distribution parameters for p_O (x' | θ; t)
-        mu_pos_final, p0_h_final, k_hat_final = self.interdependency_modeling(
+        preds = self.interdependency_modeling(
             time=torch.ones((n_nodes, 1)).to(self.device)[batch_ligand],
             protein_pos=protein_pos,
             protein_v=protein_v,
             batch_protein=batch_protein,
             batch_ligand=batch_ligand,
+            batch_ligand_bond=batch_ligand_bond,
             theta_h_t=theta_h_t,
             mu_pos_t=mu_pos_t,
             # mu_charge_t=mu_charge_t,
             gamma_coord=1 - self.sigma1_coord**2,  # γ(t) = 1 − (σ1**2) ** t
             # gamma_charge=1 - self.sigma1_charges**2,
+            theta_bond_t=theta_bond_t,
+            ligand_bond_index=ligand_bond_index,
+        )
+
+        mu_pos_final, p0_h_final, k_hat_final, pE_h_final = (
+            preds['pred_ligand_pos'],
+            preds['pred_ligand_v'],
+            preds['pred_ligand_charge'],
+            preds['pred_ligand_bond'],
         )
         # TODO delete the following condition
         if not torch.all(p0_h_final.isfinite()):
@@ -707,7 +928,15 @@ class BFN4SBDDScoreModel(BFNBase):
             )
             logging.warn("p0_h_pred is not finite")
         p0_h_final = torch.clamp(p0_h_final, min=1e-6)
-        theta_traj.append((mu_pos_final, p0_h_final, k_hat_final))
+        if self.bond_bfn:
+            if not torch.all(pE_h_final.isfinite()):
+                pE_h_final = torch.where(
+                    pE_h_final.isfinite(), pE_h_final, torch.zeros_like(pE_h_final)
+                )
+                logging.warn("pE_h_pred is not finite")
+            pE_h_final = torch.clamp(pE_h_final, min=1e-6)
+
+        theta_traj.append((mu_pos_final, p0_h_final, k_hat_final, pE_h_final))
 
         # 6. Draw final sample from p_O (· | θ_n, 1)
         # Update: directly take the mode of categorical distribution (as done in BFN paper)
@@ -752,6 +981,6 @@ class BFN4SBDDScoreModel(BFNBase):
                 k_hat_final = find_closet_index(k_hat_final, k_c)
                 sample_traj.append((mu_pos_final, k_final, k_hat_final))
         else:
-            sample_traj.append((mu_pos_final, k_final, k_hat_final))
+            sample_traj.append((mu_pos_final, k_final, k_hat_final, pE_h_final))
 
         return theta_traj, sample_traj, y_traj

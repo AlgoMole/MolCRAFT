@@ -1,9 +1,10 @@
 SHELL=/bin/bash
+PRIVATE_REGISTRY:=docker.jjgong.cloud
 BASE_IMAGE:=chloechiu/mol_base:pt112-cu116-dev
 
 PROJECT_NAME:=molcraft
 TEAM_NAME:=bfn
-PUBLIC_IMAGE:=${PROJECT_NAME}
+PUBLIC_IMAGE:=${PRIVATE_REGISTRY}/${PROJECT_NAME}
 HTTPS_PROXY:=${https_proxy}
 HTTP_PROXY:=${http_proxy}
 _USER := $(shell whoami)
@@ -14,6 +15,7 @@ PW:=rootpass
 LOCAL_NAME:=exp/${_USER}_${PROJECT_NAME}
 PRIVATE_IMAGE:=${LOCAL_NAME}
 CONTRAINER_NAME=$(subst /,_,$(LOCAL_NAME))
+# none for molbond (10990), 2 for molcraft (10970), 3 for bondtune (10950)
 
 PROJ_DIR:=${HOME}
 SHARE_DIR:=${HOME}/share
@@ -37,7 +39,7 @@ kill:
 		echo "container ${CONTRAINER_NAME} exists, killing it first"; \
 		docker container kill  ${CONTRAINER_NAME}; fi
 
-build_private: build_public _setup_sshkey _setup_gitconfig
+build_private: _setup_sshkey _setup_gitconfig
 	DOCKER_BUILDKIT=1 docker build --no-cache --target private \
 		--build-arg PUBLIC_IMAGE=${PUBLIC_IMAGE} \
 		--build-arg TORCH_HOME=${TO_TORCH_HOME} \

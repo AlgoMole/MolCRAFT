@@ -17,6 +17,7 @@ import matplotlib
 # import copy
 # import glob
 import shutil
+import time
 
 from core.evaluation.metrics import CondMolGenMetric
 # from core.evaluation.utils import convert_atomcloud_to_mol_smiles, save_mol_list
@@ -46,7 +47,10 @@ def center_pos(protein_pos, ligand_pos, batch_protein, batch_ligand, mode='prote
     return protein_pos, ligand_pos, offset
 
 
-OUT_DIR = './output'
+# add timestamp to the filename in the format of %Y-%m-%d-%H-%M-%S
+timestr = time.strftime("%Y%m%d-%H%M%S")
+OUT_DIR = f'./output-{timestr}'
+# OUT_DIR = f'./output'
 LAST_PROTEIN_FN = None
 
 
