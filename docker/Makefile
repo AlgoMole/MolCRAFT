@@ -1,10 +1,9 @@
 SHELL=/bin/bash
-PRIVATE_REGISTRY:=docker.jjgong.cloud
 BASE_IMAGE:=chloechiu/mol_base:pt112-cu116-dev
 
-PROJECT_NAME:=bfn4sbdd2
+PROJECT_NAME:=bfn4sbdd
 TEAM_NAME:=bfn
-PUBLIC_IMAGE:=${PRIVATE_REGISTRY}/${TEAM_NAME}/${PROJECT_NAME}
+PUBLIC_IMAGE:=${TEAM_NAME}/${PROJECT_NAME}
 
 HTTPS_PROXY:=${https_proxy}
 HTTP_PROXY:=${http_proxy}
