@@ -60,8 +60,8 @@ accounting:
 
 data:
   name: pl # pl, pl_tr
-  path: /sharefs/share/sbdd_data/posebusters_benchmark_set_pocket10
-  split: /sharefs/share/sbdd_data/posebusters_benchmark_184_pose_split.pt # 184
+  path: ./data/posebusters_benchmark_set_pocket10
+  split: ./data/posebusters_benchmark_184_pose_split.pt # 184
   transform:
     ligand_atom_mode: add_aromatic
   with_split: True
@@ -112,7 +112,7 @@ evaluation:
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']
   docking_config:
     mode: !SUB ${docking_mode} # ['qvina', 'vina_score', 'vina_dock']
-    protein_root: /sharefs/share/molcraft/posebusters_benchmark_set
+    protein_root: ./data/posebusters_benchmark_set
     exhaustiveness: 16
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}

@@ -83,13 +83,13 @@ accounting:
 
 data:
   name: pl # pl, pl_tr
-  path: /sharefs/share/sbdd_data/posebusters_benchmark_set_pocket10
+  path: ./data/posebusters_benchmark_set_pocket10
   version: kekulize
   smiles_path: null
   transform:
     ligand_atom_mode: !SUB ${ligand_atom_mode}
   with_split: True
-  split: /sharefs/share/sbdd_data/posebusters_benchmark_180_kekulize_pose_split.pt
+  split: ./data/posebusters_benchmark_180_kekulize_pose_split.pt
   atom_decoder: ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl']
   colors_dic: ['#FFFFFF99', 'C7', 'C0', 'C3', 'C1', 'C4', 'C8', 'C9', ]
   radius_dic: [0.3, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
@@ -139,7 +139,7 @@ evaluation:
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']
   docking_config:
     mode: vina_score  # ['qvina', 'vina_score', 'vina_dock']
-    protein_root: /sharefs/share/sbdd_data/posebusters_benchmark_set
+    protein_root: ./data/posebusters_benchmark_set
     exhaustiveness: 16
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}

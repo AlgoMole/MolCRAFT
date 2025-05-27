@@ -78,9 +78,9 @@ class DBReader:
 
     def _inject_charge(self, sid, data):
         # For PDBBind
-        # data_prefix = '/sharefs/share/sbdd_data/combine_set'
+        # data_prefix = './data/combine_set'
         # For Crossdock
-        data_prefix = '/sharefs/share/sbdd_data/crossdocked_pocket10'
+        data_prefix = './data/crossdocked_pocket10'
         txn = self.db.begin(write=True)
         data = pickle.loads(txn.get(sid))
 
@@ -177,7 +177,7 @@ class PocketLigandGeneratedPairDataset(Dataset):
     def __init__(self, raw_path, transform=None, version='4-decompdiff'):
         super().__init__()
         self.raw_path = raw_path.rstrip('/')
-        self.generated_path = os.path.join('/sharefs/share/sbdd_data/all_results', f'{version}_docked_pose_checked.pt')
+        self.generated_path = os.path.join('./data/all_results', f'{version}_docked_pose_checked.pt')
         self.processed_path = os.path.join(os.path.dirname(self.raw_path),
                                            os.path.basename(self.raw_path) + f'_processed_{version}.lmdb')
         self.transform = transform
@@ -664,40 +664,6 @@ class MoleculeDataset(Dataset):
 
 if __name__ == '__main__':
     # original dataset
-    # dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/crossdocked_v1.1_rmsd1.0_pocket10', version='final')
-    # dataset = PocketLigandPairDataset('/sharefs/share/molcraft/crossdocked_pocket10', version='final')
-    # print(len(dataset), dataset[0])
-    # pose_split = torch.load('/sharefs/share/sbdd_data/crossdocked_pocket10_pose_split_filtered.pt')
-
-    ############################################################
-    # test PocketLigandPairDatasetFromComplex
-    # dataset = PocketLigandPairDatasetFromComplex('/sharefs/share/sbdd_data/PDBLigAug')
-    # print(len(dataset), dataset[0])
-
-    ############################################################
-
-    # test DecompDiffDataset
-    # dataset = PocketLigandGeneratedPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10')
-    # print(len(dataset), dataset[0])
-
-    ############################################################
-   
-    # dataset = PocketLigandPairDatasetFromComplex('/sharefs/share/sbdd_data/SelfGenBench')
-    # dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/SelfGenBench')
-    # print(len(dataset), dataset[0])
-    # for i in tqdm(range(len(dataset))):
-    #     try:
-    #         data = dataset[i]
-    #     except Exception as e:
-    #         print(e)
-    #         continue
-
-    dataset = PocketLigandPairDatasetFromComplex('/sharefs/share/sbdd_data/POKMOL3D')
+    dataset = PocketLigandPairDataset('./data/crossdocked_v1.1_rmsd1.0_pocket10', version='final')
     print(len(dataset), dataset[0])
-    for i in tqdm(range(len(dataset))):
-        try:
-            data = dataset[i]
-        except Exception as e:
-            print(e)
-            continue
-            
+   

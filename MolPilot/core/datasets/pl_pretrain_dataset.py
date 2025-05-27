@@ -75,9 +75,9 @@ class DBReader:
 
     def _inject_charge(self, sid, data):
         # For PDBBind
-        # data_prefix = '/sharefs/share/sbdd_data/combine_set'
+        # data_prefix = './data/combine_set'
         # For Crossdock
-        data_prefix = '/sharefs/share/sbdd_data/crossdocked_pocket10'
+        data_prefix = './data/crossdocked_pocket10'
         txn = self.db.begin(write=True)
         data = pickle.loads(txn.get(sid))
 
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     
     # test MoleculeDataset
     # print('Testing MoleculeDataset')
-    # dataset = MoleculeDataset('/sharefs/share/sbdd_data/zinc', version='kekulize')
+    # dataset = MoleculeDataset('./data/zinc', version='kekulize')
     # print('Loaded dataset')
     # print(len(dataset), dataset[0])
 
@@ -323,7 +323,7 @@ if __name__ == '__main__':
 
     # calculate dataset stats
     # split = torch.load('/mnt/data/zinc_pose_split_1m_kekulize.pt')
-    dataset = MoleculeDataset('/sharefs/share/sbdd_data/posebusters_benchmark_set_pocket10')
+    dataset = MoleculeDataset('./data/posebusters_benchmark_set_pocket10')
     print(len(dataset), dataset[0])
-    split = torch.load('/sharefs/share/sbdd_data/posebusters_benchmark_184_pose_split.pt')
+    split = torch.load('./data/posebusters_benchmark_184_pose_split.pt')
     calculate_dataset_stats(dataset, split)

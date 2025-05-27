@@ -61,7 +61,7 @@ accounting:
 
 
 data:
-  name: pl_tr # pl, pl_tr
+  name: pl # pl, pl_tr
   path: ./data/crossdocked_v1.1_rmsd1.0_pocket10
   split:  ./data/crossdocked_pocket10_pose_split.pt
   transform:

@@ -55,7 +55,7 @@ def get_dataloader(cfg):
             #     trans.AddMolProp(),
             # ])
             if 'inpainting' in cfg.evaluation.sample_num_atoms:
-                transform_list.append(trans.AddScaffoldMask('/sharefs/share/sbdd_data/Mask_cd_test.pkl', cfg.evaluation.change_scaffold))
+                transform_list.append(trans.AddScaffoldMask('./data/Mask_cd_test.pkl', cfg.evaluation.change_scaffold))
         transform = Compose(transform_list)
         cfg.dynamics.protein_atom_feature_dim = protein_featurizer.feature_dim
         cfg.dynamics.ligand_atom_feature_dim = ligand_featurizer.feature_dim
@@ -218,15 +218,8 @@ if __name__ == "__main__":
 
     wandb_logger = get_logger(cfg)
 
-    work_dir = '/sharefs/share/opt_data'
-    # if cfg.test_only:
-    #     assert os.path.exists(os.path.join(work_dir, 'pretrained'))
-    #     tr_cfg = Config(os.path.join(work_dir, 'pretrained/config.yaml'))
-    # assert cfg.test_only and not cfg.evaluation.last_ckpt
-    # else:
-    #     raise NotImplementedError("Training not supported yet")
-    #     cfg.save2yaml(cfg.accounting.dump_config_path)
-
+    work_dir = '.'
+    
     if ('sde' in cfg.dynamics.sampling_strategy or 'ode' in cfg.dynamics.sampling_strategy) and cfg.dynamics.sampling_strategy != 'end_back_ode':
         best_ckpt = os.path.join(work_dir, 'pretrained/epoch28-cont.ckpt')
     else:

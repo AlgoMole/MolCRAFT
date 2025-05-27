@@ -77,14 +77,14 @@ accounting:
 
 data:
   name: pl # pl, pl_tr
-  path: /sharefs/share/sbdd_data/posebusters_benchmark_set_pocket10
+  path: ./data/posebusters_benchmark_set_pocket10
   version: kekulize_add_aromatic
-  smiles_path: /sharefs/share/sbdd_data/posebusters_benchmark_set_smiles.pkl
+  smiles_path: ./data/posebusters_benchmark_set_smiles.pkl
   transform:
     ligand_atom_mode: !SUB ${ligand_atom_mode}
   with_split: True
-  # split: /sharefs/share/sbdd_data/posebusters_pose_split_kekulize_add_aromatic.pt # 184
-  split: /sharefs/share/sbdd_data/posebusters_298_pose_split_kekulize_add_aromatic.pt
+  # split: ./data/posebusters_pose_split_kekulize_add_aromatic.pt # 184
+  split: ./data/posebusters_298_pose_split_kekulize_add_aromatic.pt
   atom_decoder: ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl']
   colors_dic: ['#FFFFFF99', 'C7', 'C0', 'C3', 'C1', 'C4', 'C8', 'C9', ]
   radius_dic: [0.3, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
@@ -131,7 +131,7 @@ evaluation:
   num_samples: 1
   sample_num_atoms: ref  # ['prior', 'ref']
   docking_config: 
-    protein_root: /sharefs/share/sbdd_data/posebusters_benchmark_set
+    protein_root: ./data/posebusters_benchmark_set
   docking_rmsd: True
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}

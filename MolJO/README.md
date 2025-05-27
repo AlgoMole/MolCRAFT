@@ -25,7 +25,7 @@ make
 ## Data
 We use the same CrossDock dataset as previous approaches with affinity info (Vina Score). Data used for training / evaluating the model is obtained from [KGDiff](https://github.com/CMACH508/KGDiff/tree/main?tab=readme-ov-file), and should be put in the `data` folder.
 
-To train the property predictor from scratch, download the lmdb file from the `data.zip` [Zenodo](https://zenodo.org/records/8419944):
+To train the property predictor from scratch, extract the files from the `data.zip` in [Zenodo](https://zenodo.org/records/8419944):
 * `crossdocked_v1.1_rmsd1.0_pocket10_processed_final.lmdb`
 * `crossdocked_pocket10_pose_split.pt`
 
@@ -43,7 +43,7 @@ python train_bfn.py --config_file configs/train_prop.yaml --sigma1_coord 0.03 --
 ```
 
 ## Sampling
-We provide the pretrained checkpoints for property predictors (Vina Score, SA) in the [pretrained](https://drive.google.com/drive/folders/12t90e-gHBbYn3tFOFIENZc0mZYFhZuX2?usp=share_link) Google Drive folder. 
+We provide the pretrained checkpoints for property predictors (Vina Score, SA) in the [pretrained](https://drive.google.com/drive/folders/12t90e-gHBbYn3tFOFIENZc0mZYFhZuX2?usp=share_link) Google Drive folder. The backbone checkpoint can be found [here](https://drive.google.com/file/d/1TcUQM7Lw1klH2wOVBu20cTsvBTcC1WKu/view?usp=share_link). After downloading them, please put the checkpoints under the `pretrained` folder.
 
 ### Sampling for pockets in the testset
 ```bash

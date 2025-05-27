@@ -36,30 +36,30 @@ def get_dataset(config, *args, **kwargs):
     elif name == 'pdbbind':
         dataset = PDBBindDataset(root, *args, **kwargs)
     elif isinstance(name, int):
-        # dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10', *args, **kwargs)
-        dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/crossdocked_v1.1_rmsd1.0_pocket10', *args, **kwargs)
-        pose_split = torch.load('/sharefs/share/sbdd_data/crossdocked_pocket10_pose_split_filtered.pt')
+        # dataset = PocketLigandPairDataset('./data/crossdocked_pocket10', *args, **kwargs)
+        dataset = PocketLigandPairDataset('./data/crossdocked_v1.1_rmsd1.0_pocket10', *args, **kwargs)
+        pose_split = torch.load('./data/crossdocked_pocket10_pose_split_filtered.pt')
         test_set = Subset(dataset, indices=pose_split['test'])
         # train_set_part1 = Subset(dataset, indices=pose_split['train'])
 
-        # if os.path.exists('/sharefs/share/sbdd_data/subset_pocket10_filtered_100k_v2.pt'):
+        # if os.path.exists('./data/subset_pocket10_filtered_100k_v2.pt'):
         #     print('Loading cached dataset...')
         #     start = time.time()
-        #     train_set = torch.load('/sharefs/share/sbdd_data/subset_pocket10_filtered_100k_v2.pt')
+        #     train_set = torch.load('./data/subset_pocket10_filtered_100k_v2.pt')
         #     print('Time:', time.time() - start)
         #     # transform = kwargs.get('transform')
         #     # train_set = [transform(ProteinLigandData(**(data.to_dict()))) for data in tqdm(train_set)]
-        #     # torch.save(train_set, '/sharefs/share/sbdd_data/subset_pocket10_filtered_100k_v2.pt')
+        #     # torch.save(train_set, './data/subset_pocket10_filtered_100k_v2.pt')
         #     # print(len(train_set), train_set[0])
         # else:
         #     train_set = []
         #     transform = kwargs.get('transform', lambda x: x)
         #     for i in trange(2, 12):
         #         version = i * 100
-        #         subset = torch.load(f'/sharefs/share/sbdd_data/subset_pocket10_filtered_{version}_10k.pt')
+        #         subset = torch.load(f'./data/subset_pocket10_filtered_{version}_10k.pt')
         #         train_set.extend(subset)
         #     train_set = [transform(ProteinLigandData(**data)) for data in tqdm(train_set)]
-        #     torch.save(train_set, '/sharefs/share/sbdd_data/subset_pocket10_filtered_100k.pt')
+        #     torch.save(train_set, './data/subset_pocket10_filtered_100k.pt')
 
         train_set = []
         start = time.time()
@@ -68,7 +68,7 @@ def get_dataset(config, *args, **kwargs):
             version = f'{i*100}'
             try:
                 dataset = PocketLigandPairDataset('/mnt/data/HelixDock-lmdb/_pocket10', version=version, *args, **kwargs)
-                # pose_split = torch.load(f'/sharefs/share/sbdd_data/HelixDock_pose_split_qed0.3_aff-5_{version}_full_filtered.pt')
+                # pose_split = torch.load(f'./data/HelixDock_pose_split_qed0.3_aff-5_{version}_full_filtered.pt')
                 pose_split = torch.load(f'/mnt/data/HelixDock_pose_split_filtered_qed0.3_aff-5_{version}_15k.pt')
                 train_set.append(Subset(dataset, indices=pose_split['train']))
             except FileNotFoundError as e:

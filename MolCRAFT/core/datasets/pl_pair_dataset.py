@@ -131,7 +131,7 @@ class PocketLigandGeneratedPairDataset(Dataset):
     def __init__(self, raw_path, transform=None, version='4-decompdiff'):
         super().__init__()
         self.raw_path = raw_path.rstrip('/')
-        self.generated_path = os.path.join('/sharefs/share/sbdd_data/all_results', f'{version}_docked_pose_checked.pt')
+        self.generated_path = os.path.join('./data/all_results', f'{version}_docked_pose_checked.pt')
         self.processed_path = os.path.join(os.path.dirname(self.raw_path),
                                            os.path.basename(self.raw_path) + f'_processed_{version}.lmdb')
         self.transform = transform
@@ -371,13 +371,13 @@ if __name__ == '__main__':
     ############################################################
 
     # test DecompDiffDataset
-    # dataset = PocketLigandGeneratedPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10')
+    # dataset = PocketLigandGeneratedPairDataset('./data/crossdocked_pocket10')
     # print(len(dataset), dataset[0])
 
     ############################################################
 
     # test featurized dataset (GPU accelerated)
-    # path = '/sharefs/share/sbdd_data/crossdocked_v1.1_rmsd1.0_pocket10'
+    # path = './data/crossdocked_v1.1_rmsd1.0_pocket10'
     # ligand_atom_mode = 'add_aromatic'
 
     # dataset = PocketLigandPairDatasetFeaturized(path, ligand_atom_mode)
