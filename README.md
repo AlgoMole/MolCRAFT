@@ -29,7 +29,7 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 ### MolCRAFT (Let's craft the molecules!)
 
-<img src="asset/molcraft.gif" width="60%" align="center">
+<img src="asset/molcraft.gif" width="60%" align=center>
 
 * **Description**: MolCRAFT is the first SBDD model that employs BFN and operates in a **continuous parameter space**. It introduces a novel noise-reduced sampling strategy to generate molecules with superior binding affinity and more stable 3D structures. MolCRAFT has demonstrated its ability to accurately model interatomic interactions, achieving reference-level Vina Scores.
 * **Key Contributions**:
