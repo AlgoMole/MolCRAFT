@@ -3,6 +3,8 @@ Official implementation of ICML 2024 ["MolCRAFT: Structure-Based Drug Design in 
 
 🎉 Our demo is now available [here](http://61.241.63.126:8000). Welcome to have a try!
 
+![](../asset/molcraft_framework.png)
+
 ## Environment
 It is highly recommended to install via docker if a Linux server with NVIDIA GPU is available.
 
