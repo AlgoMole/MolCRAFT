@@ -1,6 +1,8 @@
 # MolJO
 Official implementation of ICML 2025 ["Empower Structure-Based Molecule Optimization with Gradient Guidance"](https://arxiv.org/abs/2411.13280).
 
+![](../asset/moljo_framework.png)
+
 ## Environment
 It is highly recommended to install via docker if a Linux server with NVIDIA GPU is available.
 

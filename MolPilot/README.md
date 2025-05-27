@@ -1,6 +1,8 @@
 # MolPilot
 Official implementation of ICML 2025 ["Piloting Structure-Based Drug Design via Modality-Specific Optimal Schedule"](https://arxiv.org/abs/2505.07286).
 
+![](../asset/molpilot_vos.png)
+
 We propose VLB-Optimal Scheduling (VOS) and demonstrate its generality on the popular diffusion-based models (TargetDiff, with the code in `targetdiff` folder) and BFN-based models (our MolPilot). 
 
 In fact, VOS can be easily integrated into other frameworks, with only minor changes w.r.t. training:
@@ -27,6 +29,7 @@ class ScorePosNet3D(nn.Module):
 
 The optimal test-time noise schedule can be obtained by first storing the gridded loss surface values, and then running the dynamic programming script in `test/test_geodesic_budget.py`.
 
+![](../asset/molpilot_top1_bond_len_angle.png)
 
 ## Environment
 It is highly recommended to install via docker if a Linux server with NVIDIA GPU is available.
