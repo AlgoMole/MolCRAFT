@@ -4,7 +4,6 @@ import shutil
 
 import torch
 
-from sklearn.metrics import roc_auc_score
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose
 
