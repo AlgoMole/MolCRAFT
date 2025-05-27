@@ -43,11 +43,11 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 ![](asset/moljo_framework_all.png)
 
-* **Description**: MolJO is a gradient-based SBMO framework that leverages a continuous and differentiable space derived through Bayesian inference. It facilitates **joint guidance signals across different modalities** (continuous coordinates and discrete atom types) while preserving SE(3)-equivariance. MolJO introduces a novel backward correction strategy for an effective trade-off between exploration and exploitation during optimization.
+* **Description**: MolJO is a gradient-based SBMO framework that leverages a continuous and differentiable space derived through Bayesian inference. It facilitates **joint guidance signals across different modalities** (continuous coordinates and discrete atom types) while preserving SE(3)-equivariance. MolJO introduces a novel backward correction strategy for an effective trade-off between exploration and exploitation.
 * **Key Contributions**:
     * Gradient-based SBMO framework with joint guidance across different modalities.
     * Backward correction strategy for optimized exploration-exploitation.
-    * State-of-the-art performance in practical optimization tasks, including multi-objective and constrained optimization.
+    * State-of-the-art performance in practical optimization tasks, including multi-objective and constrained optimization for R-group redesign, scaffold hopping, etc.
 
 ---
 
@@ -58,8 +58,8 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 * **Description**: MolPilot addresses challenges in geometric structure modeling by focusing on the **twisted probability path of multi-modalities** (continuous 3D positions and discrete 2D topologies). It proposes a VLB-Optimal Scheduling (VOS) strategy, optimizing the Variational Lower Bound as a path integral for SBDD. MolPilot significantly enhances molecular geometries and interaction modeling.
 * **Key Contributions**:
     * Addresses multi-modality challenges in SBDD.
-    * Introduces VLB-Optimal Scheduling (VOS) strategy that is generally applicable to a wide range of frameworks including diffusions.
-    * Achieves 95.9% PoseBusters passing rate on CrossDock, indicating significantly improved molecular geometries.
+    * Introduces VLB-Optimal Scheduling (VOS) strategy, generally applicable to a wide range of frameworks including diffusions.
+    * Achieves 95.9% PoseBusters passing rate on CrossDock with significantly improved molecular geometries.
 
 ---
 
