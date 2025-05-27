@@ -68,15 +68,15 @@ class DBReader:
         
 
 if __name__ == '__main__':
-    dst_dir = '/sharefs/share/sbdd_data/'
+    dst_dir = './data/'
     dst_path = os.path.join(dst_dir, 'PDB+MOAD_processed_final.lmdb')
     pdb_path = os.path.join(dst_dir, 'PDBBind_processed_final.lmdb')
     moad_path = os.path.join(dst_dir, 'BindingMOAD_2020_pocket10_processed_final.lmdb')
     dataset_pdb = DBReader(pdb_path)
     dataset_moad = DBReader(moad_path)
 
-    train_names = torch.load('/sharefs/share/sbdd_data/PDB+MOAD_train_names.pt')
-    test_names = torch.load('/sharefs/share/sbdd_data/PDB+MOAD_test_names.pt') 
+    train_names = torch.load('./data/PDB+MOAD_train_names.pt')
+    test_names = torch.load('./data/PDB+MOAD_test_names.pt') 
 
     pose_split = {'train': [], 'test': []}
     num_skipped = 0
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     dataset = DBReader(dst_path)
     print(len(dataset), dataset[0])
 
-    pose_split_prev = torch.load('/sharefs/share/sbdd_data/PDB+MOAD_pose_split_filtered_qed17.pt')
+    pose_split_prev = torch.load('./data/PDB+MOAD_pose_split_filtered_qed17.pt')
     
     for i in tqdm(pose_split_prev['train'], desc='Checking Train'):
         try:
@@ -161,5 +161,5 @@ if __name__ == '__main__':
             # print(f'Error: {e}, {i}')
 
     print(len(train_names), len(test_names))
-    torch.save(pose_split, '/sharefs/share/sbdd_data/PDB+MOAD_pose_split_filtered_qed17_charge.pt')
+    torch.save(pose_split, './data/PDB+MOAD_pose_split_filtered_qed17_charge.pt')
     print(f'Train: {len(pose_split["train"])}, Test: {len(pose_split["test"])}, Skipped: {num_skipped}')

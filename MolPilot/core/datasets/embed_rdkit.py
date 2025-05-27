@@ -33,11 +33,11 @@ def embed_and_optimize_single(smiles, max_iters=200):
 
 def process_molecule(smiles, idx):
     try:
-        if os.path.exists(f'/sharefs/share/sbdd_data/ligands/unimol_{idx}.sdf'):
-            mol = Chem.SDMolSupplier(f'/sharefs/share/sbdd_data/ligands/unimol_{idx}.sdf')[0]
+        if os.path.exists(f'./data/ligands/unimol_{idx}.sdf'):
+            mol = Chem.SDMolSupplier(f'./data/ligands/unimol_{idx}.sdf')[0]
             return mol
         mol = embed_and_optimize_single(smiles)
-        writer = Chem.SDWriter(f'/sharefs/share/sbdd_data/ligands/unimol_{idx}.sdf')
+        writer = Chem.SDWriter(f'./data/ligands/unimol_{idx}.sdf')
         writer.write(mol)
         return mol
     except Exception as e:
@@ -70,11 +70,11 @@ if __name__ == "__main__":
     # Example usage
     import pandas as pd
 
-    # csv_path = '/sharefs/share/sbdd_data/250k_rndm_zinc_drugs_clean_3.csv'
+    # csv_path = './data/250k_rndm_zinc_drugs_clean_3.csv'
     # df = pd.read_csv(csv_path)
     # smiles_list = df['smiles']  # Replace with your own list of SMILES
 
-    csv_path = '/sharefs/share/sbdd_data/ligands/clean_smi.csv'
+    csv_path = './data/ligands/clean_smi.csv'
     df = pd.read_csv(csv_path, header=None)
     smiles_list = df[0].tolist()
     print(f'Number of molecules: {len(smiles_list)}')
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     # Write molecules into a single sdf
     # Note: This will write the molecules with the energy as a property
-    # writer = Chem.SDWriter('/sharefs/share/sbdd_data/zinc250k.sdf')
-    writer = Chem.SDWriter('/sharefs/share/sbdd_data/ligands/unimol.sdf')
+    # writer = Chem.SDWriter('./data/zinc250k.sdf')
+    writer = Chem.SDWriter('./data/ligands/unimol.sdf')
     for smiles, mol in results.items():
         writer.write(mol)

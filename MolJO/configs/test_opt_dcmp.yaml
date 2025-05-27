@@ -61,7 +61,7 @@ accounting:
 
 data:
   name: pl_dcmp # pl, pl_tr
-  path: /sharefs/share/sbdd_data/crossdocked_pocket10
+  path: ./data/crossdocked_pocket10
   split: null
   transform:
     ligand_atom_mode: add_aromatic
@@ -113,7 +113,7 @@ evaluation:
   sample_num_atoms: !SUB ${sample_num_atoms}  # ['prior', 'ref']
   docking_config:
     mode: !SUB ${docking_mode} # ['qvina', 'vina_score', 'vina_dock']
-    protein_root: /sharefs/share/sbdd_data/test_set
+    protein_root: ./data/test_set
     exhaustiveness: 16
   ligand_path: !SUB ${ligand_path:-null}
   protein_path: !SUB ${protein_path:-null}

@@ -34,12 +34,6 @@ To train the model from scratch, download the lmdb file and split file into data
 
 To evaluate the model on the test set, download _and_ unzip the `test_set.zip` into data folder. It includes the original PDB files that will be used in Vina Docking.
 
-By default, We transform the lmdb further into the featurized dataset as `crossdocked_v1.1_rmsd1.0_pocket10_add_aromatic_transformed_simple.pt` as described in `transform.py`, which might take several minutes. To enable accelerated training, the yaml file will be set as follows:
-
-```yaml
-data:
-  name: pl_tr # [pl, pl_tr] where tr means offline-transformed
-```
 
 ---
 ## Training
@@ -56,7 +50,7 @@ python train_bfn.py --sigma1_coord 0.03 --beta1 1.5 --lr 5e-4 --time_emb_dim 1 -
 ### Testing
 For quick evaluation of the official checkpoint, refer to `make evaluate` in `scripts.mk`:
 ```bash
-python train_bfn.py --test_only --no_wandb --ckpt_path ./checkpoints/last.ckpt
+python train_bfn.py --test_only --no_wandb --ckpt_path ./checkpoints/${CKPT_NAME}
 ```
 
 ### Debugging
@@ -66,7 +60,7 @@ python train_bfn.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
-We provide the pretrained checkpoint [here](https://drive.google.com/file/d/1TcUQM7Lw1klH2wOVBu20cTsvBTcC1WKu/view?usp=share_link). 
+We provide the pretrained MolCRAFT checkpoint [here](https://drive.google.com/file/d/1TcUQM7Lw1klH2wOVBu20cTsvBTcC1WKu/view?usp=share_link). 
 
 
 ### Sampling for pockets in the testset

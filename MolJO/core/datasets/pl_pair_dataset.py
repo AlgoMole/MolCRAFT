@@ -191,7 +191,7 @@ class PocketLigandGeneratedPairDataset(Dataset):
     def __init__(self, raw_path, transform=None, version='decompdiff20'):
         super().__init__()
         self.raw_path = raw_path.rstrip('/')
-        self.generated_path = os.path.join('/sharefs/share/sbdd_data/all_results', f'decompdiff_vina_docked_pose_checked_v3.pt')
+        self.generated_path = os.path.join('./data/all_results', f'decompdiff_vina_docked_pose_checked_v3.pt')
         self.processed_path = os.path.join(os.path.dirname(self.raw_path),
                                            os.path.basename(self.raw_path) + f'_processed_{version}.lmdb')
         self.transform = transform
@@ -479,12 +479,12 @@ class PocketLigandPairDatasetFeaturized(Dataset):
 
 if __name__ == '__main__':
     # original dataset
-    # dataset = PocketLigandPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10')
+    # dataset = PocketLigandPairDataset('./data/crossdocked_pocket10')
     # print(len(dataset), dataset[0])
 
     ############################################################
     # test PocketLigandPairDatasetFromComplex
-    # path = '/sharefs/share/sbdd_data/PDBLigAug_v2'
+    # path = './data/PDBLigAug_v2'
     # dataset = PocketLigandPairDatasetFromComplex(path)
     # print(len(dataset), dataset[0])
     # allowed_elements = {1, 6, 7, 8, 9, 15, 16, 17, 35}
@@ -515,13 +515,13 @@ if __name__ == '__main__':
     ############################################################
 
     # test DecompDiffDataset
-    dataset = PocketLigandGeneratedPairDataset('/sharefs/share/sbdd_data/crossdocked_pocket10')
+    dataset = PocketLigandGeneratedPairDataset('./data/crossdocked_pocket10')
     print(len(dataset), dataset[0])
 
     ############################################################
 
     # test featurized dataset (GPU accelerated)
-    # path = '/sharefs/share/sbdd_data/crossdocked_v1.1_rmsd1.0_pocket10'
+    # path = './data/crossdocked_v1.1_rmsd1.0_pocket10'
     # ligand_atom_mode = 'add_aromatic'
 
     # dataset = PocketLigandPairDatasetFeaturized(path, ligand_atom_mode, version='guided_v5')
