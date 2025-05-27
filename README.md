@@ -18,8 +18,8 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 | Folder                         | TL, DR               | Description                                                                                                                                                                                             |
 | --------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [MolCRAFT](./MolCRAFT/)      | Unified Space for Molecule Generation  | MolCRAFT is the first SBDD generative model based on Bayesian Flow Network (BFN) operating in continuous parameter space, with variance reduction sampling strategy to generate high-quality samples with more than 10x speedup.
-| [MolJO](./MolJO/)            | Gradient-Guided Molecule Optimization   | MolJO is a gradient-based Structure-Based Molecule Optimization (SBMO) framework. It employs joint guidance across continuous coordinates and discrete atom types, alongside a backward correction strategy for effective optimization.
+| [MolCRAFT](./MolCRAFT/)      | Unified Space for Molecule Generation  | MolCRAFT is the first SBDD generative model based on Bayesian Flow Network (BFN) operating in the unified continuous parameter space for different modalities, with variance reduction sampling strategy to generate high-quality samples with more than 10x speedup.
+| [MolJO](./MolJO/)            | Gradient-Guided Molecule Optimization   | MolJO is a gradient-based Structure-Based Molecule Optimization (SBMO) framework derived within BFN. It employs joint guidance across continuous coordinates and discrete atom types, alongside a backward correction strategy for effective optimization.
 | [MolPilot](./MolPilot/)      | Optimal Scheduling  | MolPilot enhances SBDD by introducing a VLB-Optimal Scheduling (VOS) strategy for the twisted multimodal probability paths, significantly improving molecular geometries and interaction modeling, achieving 95.9% PB-Valid rate.  |
 
 
