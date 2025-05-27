@@ -1,5 +1,6 @@
 <div align='center'>
-<h1> MolCRAFT Series: Advancing Structure-Based Drug Design </h1>
+<h1> MolCRAFT Series for Drug Design </h1>
+</div>
 
 Welcome to the official repository for the MolCRAFT series of projects! This series focuses on developing and improving deep learning models for **structure-based drug design (SBDD)** and **molecule optimization (SBMO)**. Our goal is to create molecules with high binding affinity and plausible 3D conformations.
 
