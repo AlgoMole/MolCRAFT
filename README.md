@@ -16,10 +16,10 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 ## 🧭 Navigation
 
-| Folder                         | TLDR               | Description                                                                                                                                                                                             |
-| :--------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [MolCRAFT](./MolCRAFT/)      | BFN-based SBDD Model  | MolCRAFT is the first Structure-Based Drug Design (SBDD) model operating in continuous parameter space. It designs a variance reduction sampling strategy to generate high-quality samples with more than 10x speedup.
-| [MolJO](./MolJO/)            | Gradient-Guided BFN   | MolJO is a gradient-based Structure-Based Molecule Optimization (SBMO) framework. It employs joint guidance across continuous coordinates and discrete atom types, alongside a backward correction strategy for effective optimization.
+| Folder                         | TL, DR               | Description                                                                                                                                                                                             |
+| --------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [MolCRAFT](./MolCRAFT/)      | Unified Space for Molecule Generation  | MolCRAFT is the first SBDD generative model based on Bayesian Flow Network (BFN) operating in continuous parameter space, with variance reduction sampling strategy to generate high-quality samples with more than 10x speedup.
+| [MolJO](./MolJO/)            | Gradient-Guided Molecule Optimization   | MolJO is a gradient-based Structure-Based Molecule Optimization (SBMO) framework. It employs joint guidance across continuous coordinates and discrete atom types, alongside a backward correction strategy for effective optimization.
 | [MolPilot](./MolPilot/)      | Optimal Scheduling  | MolPilot enhances SBDD by introducing a VLB-Optimal Scheduling (VOS) strategy for the twisted multimodal probability paths, significantly improving molecular geometries and interaction modeling, achieving 95.9% PB-Valid rate.  |
 
 
@@ -27,13 +27,11 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 ## 🚀 Projects
 
-Below is a brief description of each project in the series, along with links to the respective code directories and publications.
-
 ### MolCRAFT (Let's craft the molecules!)
 
-![](asset/molcraft.gif)
+<img src="asset/molcraft.gif" width="60%" align="center">
 
-* **Description**: MolCRAFT is the first SBDD model that operates in a **continuous parameter space**. It introduces a novel noise-reduced sampling strategy to generate molecules with superior binding affinity and more stable 3D structures. MolCRAFT has demonstrated its ability to accurately model interatomic interactions, achieving reference-level Vina Scores.
+* **Description**: MolCRAFT is the first SBDD model that employs BFN and operates in a **continuous parameter space**. It introduces a novel noise-reduced sampling strategy to generate molecules with superior binding affinity and more stable 3D structures. MolCRAFT has demonstrated its ability to accurately model interatomic interactions, achieving reference-level Vina Scores.
 * **Key Contributions**:
     * Operates in continuous parameter space for SBDD within BFN framework.
     * Novel variance reduction sampling strategy that improves both sample quality and efficiency.
@@ -67,11 +65,7 @@ Below is a brief description of each project in the series, along with links to 
 
 ## ⚙️ Installation & Usage
 
-Please refer to the `README.md` file within each project's subdirectory for specific instructions on installation, dependencies, and how to run the code.
-
-* [MolCRAFT README](./MolCRAFT/README.md)
-* [MolJO README](./MolJO/README.md)
-* [MolPilot README](./MolPilot/README.md)
+Please refer to the `README.md` file within each project's subdirectory for specific instructions on installation, dependencies (docker recommended), and how to run the code.
 
 ---
 
