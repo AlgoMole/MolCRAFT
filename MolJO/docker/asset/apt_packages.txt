@@ -1,0 +1,8 @@
+unzip
+autoconf
+less 
+tmux
+libxrender1
+ssh
+htop
+tree

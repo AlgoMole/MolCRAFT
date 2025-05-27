@@ -1,0 +1,29 @@
+absl-py
+AutoDockTools_py3 @ git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
+black
+datamol
+easydict
+fire
+gdown
+gpustat
+imageio
+ipykernel
+lmdb
+lxml
+matplotlib
+msgpack
+numpy
+overrides
+pandas
+pika
+posecheck @ git+https://github.com/cch1999/posecheck
+prolif
+pytorch_lightning==2.0.8
+pyyaml
+seaborn
+scipy
+tensorboard
+torchdiffeq
+tqdm
+wandb
+zuko
