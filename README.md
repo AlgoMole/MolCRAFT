@@ -1,6 +1,6 @@
 <div align='center'>
 <h1> MolCRAFT Series for Drug Design </h1>
-[![Project](https://img.shields.io/badge/Blog-3858bf?style=for-the-badge&logo=homepage&logoColor=white)](https://MolCRAFT-GenSI.github.io/)
+[![Blog](https://img.shields.io/badge/Blog-3858bf?style=for-the-badge&logo=homepage&logoColor=white)](https://MolCRAFT-GenSI.github.io/)
 </div>
 
 
