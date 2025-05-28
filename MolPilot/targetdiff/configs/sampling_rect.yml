@@ -1,0 +1,11 @@
+model:
+  checkpoint: ./logs_diffusion/training_2025_03_26__16_06_49/checkpoints/130000.pt
+
+sample:
+  seed: 2021
+  num_samples: 10
+  num_steps: 1000
+  pos_only: False
+  center_pos_mode: protein
+  sample_num_atoms: prior
+  time_scheduler_path: null
