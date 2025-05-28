@@ -1,6 +1,8 @@
 <div align='center'>
 <h1> MolCRAFT Series for Drug Design </h1>
+[![Project](https://img.shields.io/badge/Blog-3858bf?style=for-the-badge&logo=homepage&logoColor=white)](https://MolCRAFT-GenSI.github.io/)
 </div>
+
 
 Welcome to the official repository for the MolCRAFT series of projects! This series focuses on developing and improving deep learning models for **structure-based drug design (SBDD)** and **molecule optimization (SBMO)**. Our goal is to create molecules with high binding affinity and plausible 3D conformations.
 
