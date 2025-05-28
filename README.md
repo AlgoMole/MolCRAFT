@@ -1,6 +1,8 @@
 <div align='center'>
 <h1> MolCRAFT Series for Drug Design </h1>
+
 [![Project](https://img.shields.io/badge/Project_Page-blue)](https://MolCRAFT-GenSI.github.io/)
+
 </div>
 
 
