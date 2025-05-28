@@ -14,7 +14,7 @@ This repository contains the source code for the following projects:
 
 ## 📜 Overview
 
-The MolCRAFT series addresses critical challenges in generative models for SBDD, including modeling molecular geometries, handling hybrid continuous-discrete spaces, and optimizing molecules against protein targets. Each project introduces novel methodologies and achieves state-of-the-art performance on relevant benchmarks.
+The MolCRAFT series addresses critical challenges in generative models for SBDD, including modeling molecular geometries, handling hybrid continuous-discrete spaces, and optimizing molecules against protein targets. Each project introduces novel methodologies and achieves **state-of-the-art** performance on relevant benchmarks.
 
 ## 🧭 Navigation
 
