@@ -202,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--time_emb_mode", type=str, default="simple", choices=["simple", "sin", 'rbf', 'rbfnn']
     )
-    parser.add_argument("--time_emb_dim", type=int, default=1)
+    parser.add_argument("--time_emb_dim", type=int, default=0)
     parser.add_argument('--pos_init_mode', type=str, default='zero', choices=['zero', 'randn'])
 
     # eval params
