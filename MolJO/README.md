@@ -1,5 +1,5 @@
 # MolJO
-Official implementation of ICML 2025 ["Empower Structure-Based Molecule Optimization with Gradient Guidance"](https://arxiv.org/abs/2411.13280).
+Official implementation of ICML 2025 ["Empower Structure-Based Molecule Optimization with Gradient Guided Bayesian Flow Networks"](https://arxiv.org/abs/2411.13280).
 
 ![](../asset/moljo_framework.png)
 
@@ -74,7 +74,7 @@ We provide our samples as `moljo_vina_sa_vina_docked_pose_checked.pt` in the [sa
 
 ```
 @article{qiu2025empower,
-  title={Empower Structure-Based Molecule Optimization with Gradient Guidance},
+  title={Empower Structure-Based Molecule Optimization with Gradient Guided Bayesian Flow Networks},
   author={Qiu, Keyue and Song, Yuxuan and Yu, Jie and Ma, Hongbo and Cao, Ziyao and Zhang, Zhilong and Wu, Yushuai and Zheng, Mingyue and Zhou, Hao and Ma, Wei-Ying},
   journal={ICML 2025},
   year={2025}
