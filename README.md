@@ -13,7 +13,7 @@ Welcome to the official repository for the MolCRAFT series of projects! This ser
 This repository contains the source code for the following projects:
 
 * [**MolCRAFT**: Structure-Based Drug Design in Continuous Parameter Space](https://arxiv.org/abs/2404.12141) (ICML'24)
-* [**MolJO**: Empower Structure-Based Molecule Optimization with Gradient Guidance](https://arxiv.org/abs/2411.13280) (ICML'25)
+* [**MolJO**: Empower Structure-Based Molecule Optimization with Gradient Guided Bayesian Flow Networks](https://arxiv.org/abs/2411.13280) (ICML'25)
 * [**MolPilot**: Piloting Structure-Based Drug Design via Modality-Specific Optimal Schedule](https://arxiv.org/abs/2505.07286) (ICML'25)
 
 ## 📜 Overview
@@ -105,7 +105,7 @@ If you use any of the methods or code from this repository in your research, ple
 }
 
 @article{qiu2025empower,
-  title={Empower Structure-Based Molecule Optimization with Gradient Guidance},
+  title={Empower Structure-Based Molecule Optimization with Gradient Guided Bayesian Flow Networks},
   author={Qiu, Keyue and Song, Yuxuan and Yu, Jie and Ma, Hongbo and Cao, Ziyao and Zhang, Zhilong and Wu, Yushuai and Zheng, Mingyue and Zhou, Hao and Ma, Wei-Ying},
   journal={ICML 2025},
   year={2025}
