@@ -697,7 +697,7 @@ class MoleculeDataset(Dataset):
 
 if __name__ == '__main__':
     # original dataset
-    dataset = PocketLigandPairDataset('./data/crossdocked_v1.1_rmsd1.0_pocket10', version='final')
+    dataset = PocketLigandPairDataset('./data/crossdocked_v1.1_rmsd1.0_pocket10', version='kekulize')
     # dataset = PocketLigandPairDataset('./data/crossdocked_pocket10', version='final')
     print(len(dataset), dataset[0])
     
