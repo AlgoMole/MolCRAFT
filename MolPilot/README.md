@@ -53,11 +53,13 @@ make
 
 -----
 ## Data
-We use the same data as [TargetDiff](https://github.com/guanjq/targetdiff/tree/main?tab=readme-ov-file#data). Data used for training / evaluating the model should be put in the `data` folder by default, and accessible in the [data](https://drive.google.com/drive/folders/1j21cc7-97TedKh_El5E34yI8o5ckI7eK?usp=share_link) Google Drive folder.
+We preprocess the CrossDock data from [TargetDiff](https://github.com/guanjq/targetdiff/tree/main?tab=readme-ov-file#data), using `rdkit.Chem.Kekulize` as described [here](https://github.com/AlgoMole/MolCRAFT/blob/master/MolPilot/core/datasets/utils.py#L446).Data used for training / evaluating the model should be put in the `data` folder by default.
+
+To process the training data from scratch, download `crossdocked_v1.1_rmsd1.0.tar.gz` from TargetDiff's [data](https://drive.google.com/drive/folders/1j21cc7-97TedKh_El5E34yI8o5ckI7eK) Google Drive folder, untar the files and run the scripts in `scripts/data_preparation` as described in TargetDiff, obtaining the `crossdocked_v1.1_rmsd1.0_pocket10` folder with pose split file. Then, simply run `python core/datasets/pl_pair_dataset.py` with the [version](https://github.com/AlgoMole/MolCRAFT/blob/master/MolPilot/core/datasets/pl_pair_dataset.py#L700) set to `kekulize`.
 
 To train the model from scratch, download the lmdb file and split file into data folder:
-* `crossdocked_v1.1_rmsd1.0_pocket10_processed_final.lmdb`
-* `crossdocked_pocket10_pose_split.pt`
+* `crossdocked_v1.1_rmsd1.0_pocket10_processed_kekulize.lmdb`
+* `crossdocked_pocket10_pose_split_kekulize.pt`
 
 To evaluate the model on the test set, download _and_ unzip the `test_set.zip` into data folder. It includes the original PDB files that will be used in Vina Docking.
 
@@ -83,8 +85,7 @@ python train_bfn_twisted.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
-We provide the pretrained MolPilot checkpoint [here](https://drive.google.com/file/d/1c-lD3yfRx6JlbTWq-jAdirrK6sK2lGLq/view?usp=share_link). 
-
+We provide the pretrained MolPilot checkpoint and config [here](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link). 
 
 ### Sampling for pockets in the testset
 To sample for CrossDock, set the `CONFIG` to `configs/crossdock_train_test.yaml`. For PoseBusters, set it to `configs/posebusters_test.yaml`.
