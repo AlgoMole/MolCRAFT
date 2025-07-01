@@ -1,4 +1,11 @@
 # MolPilot
+
+[![HuggingFace](https://img.shields.io/badge/Hugging_Face-4d8cd8?style=for-the-badge&logo=huggingface&logoColor=white)](https://huggingface.co/GenSI/MolPilot)
+[![Github](https://img.shields.io/badge/Github-4d8cd8?style=for-the-badge&logo=github&logoColor=white)](https://github.com/AlgoMole/MolCRAFT/tree/master)
+[![Blog](https://img.shields.io/badge/Blog-3858bf?style=for-the-badge&logo=homepage&logoColor=white)](https://MolCRAFT-GenSI.github.io/)
+[![Data](https://img.shields.io/badge/Data-4d8cd8?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link)
+
+
 Official implementation of ICML 2025 ["Piloting Structure-Based Drug Design via Modality-Specific Optimal Schedule"](https://arxiv.org/abs/2505.07286).
 
 ![](../asset/molpilot_vos.png)
@@ -53,19 +60,17 @@ make
 
 -----
 ## Data
-We preprocess the CrossDock data from [TargetDiff](https://github.com/guanjq/targetdiff/tree/main?tab=readme-ov-file#data), using `rdkit.Chem.Kekulize` as described [here](https://github.com/AlgoMole/MolCRAFT/blob/master/MolPilot/core/datasets/utils.py#L446).Data used for training / evaluating the model should be put in the `data` folder by default.
-
-To process the training data from scratch, download `crossdocked_v1.1_rmsd1.0.tar.gz` from TargetDiff's [data](https://drive.google.com/drive/folders/1j21cc7-97TedKh_El5E34yI8o5ckI7eK) Google Drive folder, untar the files and run the scripts in `scripts/data_preparation` as described in TargetDiff, obtaining the `crossdocked_v1.1_rmsd1.0_pocket10` folder with pose split file. Then, simply run `python core/datasets/pl_pair_dataset.py` with the [version](https://github.com/AlgoMole/MolCRAFT/blob/master/MolPilot/core/datasets/pl_pair_dataset.py#L700) set to `kekulize`.
-
-To train the model from scratch, download the lmdb file and split file into data folder:
+We preprocess the CrossDock data using `rdkit.Chem.Kekulize`, and provide the lmdb file and split file on [hugging face](https://huggingface.co/GenSI/MolPilot/tree/main). To train the model from scratch, download the lmdb file and split file into `data` folder:
 * `crossdocked_v1.1_rmsd1.0_pocket10_processed_kekulize.lmdb`
 * `crossdocked_pocket10_pose_split_kekulize.pt`
 
-To evaluate the model on the test set, download _and_ unzip the `test_set.zip` into data folder. It includes the original PDB files that will be used in Vina Docking.
+To process the training data from scratch, download `crossdocked_v1.1_rmsd1.0.tar.gz` from TargetDiff's [data](https://drive.google.com/drive/folders/1j21cc7-97TedKh_El5E34yI8o5ckI7eK) Google Drive folder, untar the files and run the scripts in `scripts/data_preparation` as described in [TargetDiff](https://github.com/guanjq/targetdiff/tree/main?tab=readme-ov-file#data), obtaining the `crossdocked_v1.1_rmsd1.0_pocket10` folder with pose split file. Then, simply run `python core/datasets/pl_pair_dataset.py` with the [version](https://github.com/AlgoMole/MolCRAFT/blob/master/MolPilot/core/datasets/pl_pair_dataset.py#L700) set to `kekulize`.
+
+To evaluate the model on the test set, download _and_ unzip the `test_set.zip` from TargetDiff into data folder. It includes the original PDB files that will be used in Vina Dock.
 
 ```yaml
 data:
-  name: pl # [pl, pl_tr] where tr means offline-transformed
+  version: kekulize
 ```
 
 ---
@@ -85,7 +90,7 @@ python train_bfn_twisted.py --no_wandb --debug --epochs 1
 ```
 
 ## Sampling
-We provide the pretrained MolPilot checkpoint and config [here](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link). 
+We provide the pretrained MolPilot checkpoint and config on [hugging face](https://huggingface.co/GenSI/MolPilot/tree/main). 
 
 ### Sampling for pockets in the testset
 To sample for CrossDock, set the `CONFIG` to `configs/crossdock_train_test.yaml`. For PoseBusters, set it to `configs/posebusters_test.yaml`.
