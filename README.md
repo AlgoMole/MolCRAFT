@@ -4,6 +4,7 @@
 [![Model](https://img.shields.io/badge/Model-3858bf?style=for-the-badge&logo=huggingface&logoColor=white)](https://huggingface.co/GenSI/MolCRAFT/)
 [![Blog](https://img.shields.io/badge/Blog-3858bf?style=for-the-badge&logo=homepage&logoColor=white)](https://MolCRAFT-GenSI.github.io/)
 [![Data](https://img.shields.io/badge/Data-4d8cd8?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/16KiwfMGUIk4a6mNU20GnUd0ah-mjNlhC?usp=share_link)
+[![Demo](https://img.shields.io/badge/Demo-4d8cd8?style=for-the-badge&logo=moleculer&logoColor=white)](http://61.241.63.126:8000)
 
 </div>
 
@@ -33,7 +34,7 @@ The MolCRAFT series addresses critical challenges in generative models for SBDD,
 
 ## 🚀 Projects
 
-### MolCRAFT (Let's Craft the Molecules)
+### MolCRAFT (Craft the Molecules)
 
 <p align="center"><img src="asset/molcraft.gif" width="60%"></p>
 
