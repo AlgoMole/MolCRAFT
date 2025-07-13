@@ -1982,7 +1982,7 @@ class ClassifierValidationCallback(Callback):
 
 
 class DockingTestCallback(Callback):
-    def __init__(self, dataset, atom_enc_mode, atom_decoder, atom_type_one_hot, single_bond, docking_config, dataset_smiles_set=[], docking_rmsd=False) -> None:
+    def __init__(self, dataset, atom_enc_mode, atom_decoder, atom_type_one_hot, single_bond, docking_config, dataset_smiles_set=[], docking_rmsd=False,output_dir=None) -> None:
         super().__init__()
         self.dataset = dataset
         self.atom_enc_mode = atom_enc_mode
@@ -1991,6 +1991,7 @@ class DockingTestCallback(Callback):
         self.type_one_hot = atom_type_one_hot
         self.docking_config = docking_config
         self.outputs = []
+        self.output_dir = output_dir 
         self.dataset_smiles_set = dataset_smiles_set
         self.docking_rmsd = docking_rmsd
     

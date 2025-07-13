@@ -89,8 +89,8 @@ def get_chem(mol):
     #     ret = ret / rcount
     # TypeError: unsupported operand type(s) for /: 'Counter' and 'int'
 
-    # logp_score = get_logp(mol)
-    # lipinski_score = obey_lipinski(mol)
+    logp_score = get_logp(mol)
+    lipinski_score = obey_lipinski(mol)
     # ring_info = mol.GetRingInfo()
     # ring_size = Counter([len(r) for r in ring_info.AtomRings()])
     # hacc_score = Lipinski.NumHAcceptors(mol)
@@ -99,8 +99,8 @@ def get_chem(mol):
     return {
         'qed': qed_score,
         'sa': sa_score,
-        # 'logp': logp_score,
-        # 'lipinski': lipinski_score,
+        'logp': logp_score,
+        'lipinski': lipinski_score,
         # 'ring_size': ring_size
     }
 
