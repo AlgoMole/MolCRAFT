@@ -2,6 +2,8 @@ import copy
 import numpy as np
 import torch
 import wandb
+import os
+from rdkit import Chem
 
 from time import time
 from typing import Any
@@ -400,8 +402,13 @@ class SBDD4Train(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         out_data_list = []
-        for _ in range(self.cfg.evaluation.num_samples):
-            out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms))
+        for i in range(self.cfg.evaluation.num_samples):
+            sampled = self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms)
+            for idx, data in enumerate(sampled):
+                if hasattr(data, "mol") and data.mol is not None:
+                    sdf_path = os.path.join(self.cfg.evaluation.output_dir, f"{batch_idx}_{i}_{idx}.sdf")
+                    Chem.MolToMolFile(data.mol, sdf_path)
+            out_data_list.extend(sampled)
         return out_data_list
 
     def shared_sampling_step(self, batch, batch_idx, sample_num_atoms):
