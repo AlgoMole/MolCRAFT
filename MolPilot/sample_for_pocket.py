@@ -165,22 +165,11 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         return super().default(obj)
 
-def get_default_paths():
-    
-    default_ckpt = "/home/xthdhb/MolCRAFT/MolPilot/checkpoints/molpilot_epoch26-val_loss5.42-mol_stable0.48-complete0.83.ckpt"
-    default_config = "/home/xthdhb/MolCRAFT/MolPilot/configs/molpilot_config.yaml"
-    
-    return {
-        "ckpt_path": str(default_ckpt),
-        "config_path": str(default_config)
-    }
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    default_paths = get_default_paths()
 
     # meta
-    parser.add_argument("--config_file", type=str, default=default_paths["config_path"])
+    parser.add_argument("--config_file", type=str, default="configs/molpilot_config.yaml")
     parser.add_argument("--exp_name", type=str, default="debug")
     parser.add_argument("--revision", type=str, default="default")
     parser.add_argument("--debug", action="store_true")
@@ -188,7 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--wandb_resume_id", type=str, default=None)
     parser.add_argument('--empty_folder', action='store_true')
     parser.add_argument("--test_only", action="store_true")
-    parser.add_argument("--ckpt_path", type=str, default=default_paths["ckpt_path"])
+    parser.add_argument("--ckpt_path", type=str, default='checkpoints/molpilot_epoch26-val_loss5.42-mol_stable0.48-complete0.83.ckpt')
     
     # global config
     parser.add_argument('--seed', type=int, default=1234)
@@ -266,6 +255,7 @@ if __name__ == "__main__":
     _args = parser.parse_args()
     cfg = Config(**_args.__dict__)
     seed_everything(cfg.seed)
+
 
     logging_level = {
         "info": logging.INFO,
