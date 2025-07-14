@@ -34,7 +34,12 @@ from pytorch_lightning.profilers import SimpleProfiler, PyTorchProfiler
 
 from absl import logging
 import glob
-
+import json
+from rdkit import Chem
+import numpy as np
+from core.evaluation.utils import scoring_func
+from core.evaluation.docking_vina import VinaDockingTask
+from posecheck import PoseCheck
 
 def get_dataloader_from_pdb(cfg):
     assert cfg.evaluation.protein_path is not None and cfg.evaluation.ligand_path is not None
@@ -111,12 +116,60 @@ def get_logger(cfg):
         )  # add wandb parameters
     return wandb_logger
 
+class Metrics:
+    def __init__(self, protein_fn, ref_ligand_fn, ligand_fn):
+        self.protein_fn = protein_fn
+        self.ref_ligand_fn = ref_ligand_fn
+        self.ligand_fn = ligand_fn
+        self.exhaustiveness = 16
+
+    def vina_dock(self, mol):
+        chem_results = {}
+        try:
+            chem_results.update(scoring_func.get_chem(mol))
+            chem_results['atom_num'] = mol.GetNumAtoms()
+            vina_task = VinaDockingTask.from_generated_mol(
+                mol, ligand_filename=self.ref_ligand_fn, protein_filename=self.protein_fn)
+            score_only_results = vina_task.run(mode='score_only', exhaustiveness=self.exhaustiveness)
+            minimize_results = vina_task.run(mode='minimize', exhaustiveness=self.exhaustiveness)
+            chem_results['vina_score'] = score_only_results[0]['affinity']
+            chem_results['vina_minimize'] = minimize_results[0]['affinity']
+            return chem_results
+        except Exception as e:
+            print(f"[WARN] Docking failed: {e}")
+            return {}
+
+    def pose_check(self, mol):
+        pc = PoseCheck()
+        try:
+            pc.load_ligands_from_mols([mol])
+            strain = pc.calculate_strain_energy()[0]
+            return {'strain': strain}
+        except:
+            return {}
+
+    def evaluate(self):
+        mol = Chem.SDMolSupplier(self.ligand_fn, removeHs=False)[0]
+        results = self.vina_dock(mol)
+        results.update(self.pose_check(mol))
+        return results
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # meta
-    parser.add_argument("--config_file", type=str, default="configs/default.yaml",)
+    parser.add_argument("--config_file", type=str, default="configs/molpilot_config.yaml")
     parser.add_argument("--exp_name", type=str, default="debug")
     parser.add_argument("--revision", type=str, default="default")
     parser.add_argument("--debug", action="store_true")
@@ -124,7 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--wandb_resume_id", type=str, default=None)
     parser.add_argument('--empty_folder', action='store_true')
     parser.add_argument("--test_only", action="store_true")
-    parser.add_argument("--ckpt_path", type=str, default=None)
+    parser.add_argument("--ckpt_path", type=str, default='checkpoints/molpilot_epoch26-val_loss5.42-mol_stable0.48-complete0.83.ckpt')
     
     # global config
     parser.add_argument('--seed', type=int, default=1234)
@@ -195,9 +248,14 @@ if __name__ == "__main__":
     parser.add_argument("--protein_path", type=str, default=None)
     parser.add_argument("--ligand_path", type=str, default=None)
 
+    parser.add_argument("--output_dir", type=str, required=True, help="Directory to save generated sdf files.")
+    parser.add_argument("--res_path", type=str, required=True, help="Path to save results json file.")
+
+
     _args = parser.parse_args()
     cfg = Config(**_args.__dict__)
     seed_everything(cfg.seed)
+
 
     logging_level = {
         "info": logging.INFO,
@@ -315,5 +373,29 @@ if __name__ == "__main__":
         model.time_scheduler = time_scheduler
         print(f"Loaded time scheduler from {cfg.evaluation.time_scheduler_path}")
 
+    cfg.evaluation.output_dir = _args.output_dir
+    cfg.evaluation.res_path = _args.res_path
+
+    if not hasattr(cfg.evaluation, 'fix_bond'):
+        cfg.evaluation.fix_bond = False
+
+    os.makedirs(os.path.dirname(cfg.evaluation.res_path), exist_ok=True)
+    os.makedirs(cfg.evaluation.output_dir, exist_ok=True)
+
     trainer.test(model, dataloaders=test_loader)
+
+    results = []
+    for sdf_file in sorted(os.listdir(cfg.evaluation.output_dir)):
+        if not sdf_file.endswith(".sdf"):
+            continue
+        sdf_path = os.path.join(cfg.evaluation.output_dir, sdf_file)
+        print(f"[INFO] Evaluating {sdf_path}")
+        metrics = Metrics(cfg.evaluation.protein_path, cfg.evaluation.ligand_path, sdf_path).evaluate()
+        metrics['name'] = sdf_file
+        results.append(metrics)
+
+    os.makedirs(os.path.dirname(cfg.evaluation.res_path), exist_ok=True)
+    with open(cfg.evaluation.res_path, "w") as f:
+        json.dump(results, f, indent=4, cls=NpEncoder)
+    print(f"[INFO] Results saved to {cfg.evaluation.res_path}")
 

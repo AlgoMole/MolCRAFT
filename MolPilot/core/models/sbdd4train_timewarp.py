@@ -4,6 +4,8 @@ import copy
 import numpy as np
 import torch
 import wandb
+import os
+from rdkit import Chem
 
 from time import time
 from typing import Any
@@ -442,8 +444,13 @@ class SBDD4Train(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         out_data_list = []
-        for _ in range(self.cfg.evaluation.num_samples):
-            out_data_list.extend(self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms))
+        for i in range(self.cfg.evaluation.num_samples):
+            sampled = self.shared_sampling_step(batch, batch_idx, sample_num_atoms=self.cfg.evaluation.sample_num_atoms)
+            for idx, data in enumerate(sampled):
+                if hasattr(data, "mol") and data.mol is not None:
+                    sdf_path = os.path.join(self.cfg.evaluation.output_dir, f"{batch_idx}_{i}_{idx}.sdf")
+                    Chem.MolToMolFile(data.mol, sdf_path)
+            out_data_list.extend(sampled)
         return out_data_list
 
     def shared_sampling_step(self, batch, batch_idx, sample_num_atoms):
@@ -532,14 +539,14 @@ class SBDD4Train(pl.LightningModule):
         sample_steps = self.cfg.evaluation.sample_steps
         u_steps = torch.linspace(1, 0, sample_steps + 1, device=self.device, dtype=torch.float32)
 
-        if self.timewarp_cdf is not None:
-            raise ValueError("timewarp_cdf not supported in validation")
+        #if self.timewarp_cdf is not None:
+            #raise ValueError("timewarp_cdf not supported in validation")
             # Warp u to t' (sigma)
-            t_steps = self.timewarp_cdf(u_steps, invert=True).detach().to(torch.float32)
-            t_steps = (t_steps - self.timewarp_cdf.sigma_min) / (self.timewarp_cdf.sigma_max - self.timewarp_cdf.sigma_min)
+            #t_steps = self.timewarp_cdf(u_steps, invert=True).detach().to(torch.float32)
+            #t_steps = (t_steps - self.timewarp_cdf.sigma_min) / (self.timewarp_cdf.sigma_max - self.timewarp_cdf.sigma_min)
             # Reverse t' to get t = 1 - t'
-            t_steps = 1 - t_steps
-        elif self.time_scheduler is not None:
+            #t_steps = 1 - t_steps
+        if self.time_scheduler is not None:
             # TODO
             t_steps = self.time_scheduler / self.time_scheduler.max()
             assert t_steps.shape == (sample_steps + 1, 2), f"t_steps: {t_steps.shape}"
